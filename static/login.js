@@ -1,4 +1,4 @@
-// --- NEW: Import the solver ---
+// --- Import the solver ---
 import { solveCaptchaClient } from './solver.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,15 +34,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function showLoginScreen() {
         loadingContainer.classList.add('hidden');
         loginContainer.classList.remove('hidden');
-        preFetchCaptcha();
+        // This is an initial load, not a retry
+        preFetchCaptcha(false); 
     }
 
     // --- CORE LOGIC ---
     
-    async function preFetchCaptcha() {
+    /**
+     * Fetches a new CAPTCHA and session from the server.
+     * @param {boolean} isRetry - If true, automatically re-submits the login form after solving.
+     */
+    async function preFetchCaptcha(isRetry = false) {
         captchaGroup.classList.remove('hidden');
         captchaImageContainer.innerHTML = '<i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>';
-        setStatus('Fetching CAPTCHA...', false);
+        setStatus('Fetching new CAPTCHA...', false);
         
         try {
             const response = await fetch(`${API_BASE_URL}/start-login`, { method: 'POST' });
@@ -53,19 +58,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionIdInput.value = data.session_id;
                 captchaImageContainer.innerHTML = `<img src="${data.captcha_image_data}" alt="CAPTCHA"/>`;
                 
-                // --- NEW SOLVER IMPLEMENTATION ---
                 setStatus('Solving CAPTCHA...', false);
                 try {
                     const solvedText = await solveCaptchaClient(data.captcha_image_data);
                     captchaInput.value = solvedText;
-                    setStatus('CAPTCHA Auto-Solved. Ready to login.', false);
-                    passwordInput.focus(); // Focus password as next step
+                    
+                    // --- THIS IS THE NEW AUTO-SUBMIT LOGIC ---
+                    if (isRetry) {
+                        setStatus('New CAPTCHA solved. Auto-retrying login...', false);
+                        // Automatically call login again
+                        handleLoginAttempt(); 
+                    } else {
+                        // This is a normal first load
+                        setStatus('CAPTCHA Auto-Solved. Ready to login.', false);
+                        passwordInput.focus();
+                    }
+                    
                 } catch (solveError) {
                     console.error('CAPTCHA solve error:', solveError);
                     setStatus('Failed to auto-solve. Please enter manually.', true);
-                    captchaInput.focus(); // Fallback to manual entry
+                    captchaInput.focus();
                 }
-                // --- END NEW SOLVER ---
 
             } else {
                 throw new Error(data.message || 'Failed to get CAPTCHA.');
@@ -128,25 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'success') {
                 localStorage.setItem('vtop_session_id', data.session_id);
                 window.location.href = '/';
+            
+            // --- THIS BLOCK IS THE FIX ---
             } else if (data.status === 'invalid_credentials' || data.status === 'invalid_captcha') {
+                // The login failed. Re-run the entire /start-login handshake.
+                // Pass `true` to auto-submit when the new CAPTCHA is solved.
                 setStatus(data.message + " Fetching new CAPTCHA...", true);
-                sessionIdInput.value = data.session_id;
-                captchaImageContainer.innerHTML = `<img src="${data.captcha_image_data}" alt="New CAPTCHA"/>`;
-                captchaInput.value = ''; // Clear old one
-                
-                // --- NEW SOLVER IMPLEMENTATION (on fail) ---
-                setStatus('Solving new CAPTCHA...', false);
-                try {
-                    const solvedText = await solveCaptchaClient(data.captcha_image_data);
-                    captchaInput.value = solvedText;
-                    setStatus('New CAPTCHA solved. Please try again.', false);
-                    passwordInput.focus(); 
-                } catch (solveError) {
-                    console.error('CAPTCHA solve error:', solveError);
-                    setStatus('Failed to auto-solve. Please enter manually.', true);
-                    captchaInput.focus(); // Fallback
-                }
-                // --- END NEW SOLVER ---
+                preFetchCaptcha(true); 
+            
             } else {
                 throw new Error(data.message || "An unknown login error occurred.");
             }
