@@ -47,7 +47,12 @@ document.addEventListener('DOMContentLoaded', () => {
     async function preFetchCaptcha(isRetry = false) {
         captchaGroup.classList.remove('hidden');
         captchaImageContainer.innerHTML = '<i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>';
-        setStatus('Fetching new CAPTCHA...', false);
+        
+        // --- FIX ---
+        // Only set status *after* fetch, not before, so we don't overwrite errors.
+        if (isRetry) {
+             setStatus('Fetching new CAPTCHA...', false);
+        }
         
         try {
             const response = await fetch(`${API_BASE_URL}/start-login`, { method: 'POST' });
@@ -63,14 +68,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const solvedText = await solveCaptchaClient(data.captcha_image_data);
                     captchaInput.value = solvedText;
                     
-                    // --- THIS IS THE NEW AUTO-SUBMIT LOGIC ---
                     if (isRetry) {
                         setStatus('New CAPTCHA solved. Auto-retrying login...', false);
-                        // Automatically call login again
                         handleLoginAttempt(); 
                     } else {
-                        // This is a normal first load
-                        setStatus('CAPTCHA Auto-Solved. Ready to login.', false);
+                        // On a manual failure (like bad password), this will be the last status shown.
+                        setStatus('New CAPTCHA solved. Please try again.', false);
                         passwordInput.focus();
                     }
                     
@@ -135,26 +138,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {'Content-Type': 'application/json'}, 
                 body: JSON.stringify(payload) 
             });
-            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+            
             const data = await response.json();
 
             if (data.status === 'success') {
+                setStatus('Success! Redirecting...', false);
                 localStorage.setItem('vtop_session_id', data.session_id);
                 window.location.href = '/';
             
-            // --- THIS BLOCK IS THE FIX ---
-            } else if (data.status === 'invalid_credentials' || data.status === 'invalid_captcha') {
-                // The login failed. Re-run the entire /start-login handshake.
-                // Pass `true` to auto-submit when the new CAPTCHA is solved.
-                setStatus(data.message + " Fetching new CAPTCHA...", true);
-                preFetchCaptcha(true); 
+            } else if (data.status === 'invalid_captcha') {
+                // CAPTCHA FAILED - This is a solver error, so AUTO-RETRY.
+                // We keep the button spinner on.
+                setStatus(data.message + " Auto-retrying with new CAPTCHA...", true);
+                preFetchCaptcha(true); // 'true' triggers auto-submit
             
             } else {
-                throw new Error(data.message || "An unknown login error occurred.");
+                // ALL OTHER ERRORS (invalid_credentials, max_attempts, etc.)
+                // This is a user error. STOP, show the error, and get a new CAPTCHA.
+                setStatus(data.message, true); // <-- This now correctly displays the error.
+                setButtonLoading(false); // Stop the spinner.
+                preFetchCaptcha(false); // 'false' just gets a new CAPTCHA and stops.
             }
+
         } catch (error) {
             setStatus(error.message, true);
-        } finally {
             setButtonLoading(false);
         }
     }
