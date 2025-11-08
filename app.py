@@ -1,7 +1,7 @@
 from flask import Flask, render_template, redirect, url_for
 from flask_cors import CORS
 import os
-from whitenoise import WhiteNoise # <--- 1. IMPORT WHITENOISE
+from whitenoise import WhiteNoise
 
 # Import blueprints
 from auth import auth_bp
@@ -10,9 +10,8 @@ from data_routes import data_bp
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
 
-# --- 2. ADD THIS LINE ---
-# This "wraps" your app and tells it to serve files from the 'static' folder
-app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/')
+# Add whitenoise
+app.wsgi_app = WhiteNoise(app.wsgi_app)
 
 # Register blueprints
 app.register_blueprint(auth_bp)

@@ -3,40 +3,342 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VTOP Client - Dashboard</title>
+    <title>MyCampus Hub - Student Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4 font-[Inter,sans-serif]">
-    <div class="w-full max-w-6xl mx-auto">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+        }
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .nav-link.active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .nav-link.active svg {
+            color: white;
+        }
         
-        <div id="loadingContainer" class="text-center p-8">
-            <i class="fas fa-spinner fa-spin text-4xl text-indigo-600"></i>
-            <p class="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
+        /* Dark Mode Styles */
+        .dark body {
+            background-color: #111827;
+            color: #d1d5db;
+        }
+        .dark .sidebar, .dark header, .dark .card {
+            background-color: #1f2937;
+        }
+        .dark .sidebar, .dark header {
+             border-color: #374151;
+        }
+        .dark .card {
+            border: 1px solid #374151;
+        }
+        .dark .text-gray-800, .dark .text-gray-900 {
+            color: #f9fafb;
+        }
+        .dark .text-gray-500 {
+            color: #9ca3af;
+        }
+        .dark input:not([disabled]) {
+            background-color: #374151;
+            border-color: #4b5563;
+            color: #f9fafb;
+        }
+        .dark .nav-link, .dark .academics-nav-link {
+            color: #d1d5db;
+        }
+        .dark .academics-nav-link.active-subsection,
+        .dark .hover\:bg-gray-100:hover {
+            background-color: #374151;
+        }
+        .dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+            border-color: #374151;
+        }
+        .dark .bg-gray-50 {
+            background-color: #374151;
+        }
+        .dark .dark\:bg-gray-700 {
+            background-color: #374151;
+        }
+        .dark .dark\:text-gray-200 {
+            color: #e5e7eb;
+        }
 
-        <div id="dashboardContainer" class="hidden w-full bg-white p-6 sm:p-8 rounded-xl shadow-lg transition-all duration-300">
-             <div class="flex flex-col sm:flex-row justify-between items-start mb-6 border-b pb-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-1">Dashboard</h2>
-                    <p id="welcomeMessage" class="text-gray-600"></p>
+        .academics-nav-link.active-subsection {
+            font-weight: 600;
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        .dark .academics-nav-link.active-subsection {
+             color: #a5b4fc;
+             background-color: #374151;
+        }
+        
+        /* --- STYLES FROM YOUR WORKING TIMETABLE --- */
+        .timetable-cell-content {
+            transition: all 0.2s ease-in-out;
+        }
+        .timetable-cell-content:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        :root {
+            --color-course-0: 239 246 255; /* blue */
+            --color-course-1: 240 253 244; /* green */
+            --color-course-2: 255 251 235; /* amber */
+            --color-course-3: 254 242 242; /* red */
+            --color-course-4: 245 243 255; /* violet */
+            --color-course-5: 236 252 249; /* teal */
+            --color-course-6: 255 247 237; /* orange */
+        }
+        .course-color-0 { background-color: rgb(var(--color-course-0)); }
+        .course-color-1 { background-color: rgb(var(--color-course-1)); }
+        .course-color-2 { background-color: rgb(var(--color-course-2)); }
+        .course-color-3 { background-color: rgb(var(--color-course-3)); }
+        .course-color-4 { background-color: rgb(var(--color-course-4)); }
+        .course-color-5 { background-color: rgb(var(--color-course-5)); }
+        .course-color-6 { background-color: rgb(var(--color-course-6)); }
+        
+        /* Fix for partial table */
+        #data-container table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 1.5rem; 
+            font-size: 12px; 
+            text-align: center; 
+            border: 2px solid #3c8dbc; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        #data-container th, #data-container td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            vertical-align: middle; 
+        }
+        #data-container th { 
+            background-color: #3c8dbc; 
+            color: white; 
+            font-weight: 600; 
+            position: sticky; 
+            top: 0; 
+        }
+        #data-container details > summary { 
+            list-style: none; 
+            cursor: pointer;
+        }
+        #data-container details > summary::-webkit-details-marker { 
+            display: none; 
+        }
+        #data-container details[open] summary .arrow { 
+            transform: rotate(90deg); 
+        }
+        /* --- END STYLES FROM TIMETABLE --- */
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <aside id="sidebar" class="sidebar bg-white text-gray-800 w-64 fixed inset-y-0 left-0 z-30 overflow-y-auto shadow-lg md:relative md:translate-x-0 transform -translate-x-full border-r border-gray-200">
+        <div class="p-5 border-b border-gray-200">
+            <h1 class="text-2xl font-bold text-indigo-600">VTOP Client</h1>
+            <div class="mt-4">
+                <div class="flex items-center">
+                    <img class="h-12 w-12 rounded-full object-cover" src="https://placehold.co/100x100/6366f1/white?text=U" alt="User Avatar">
+                    <div class="ml-3">
+                        <p id="sidebar-username" class="text-sm font-semibold text-gray-900">Loading...</p>
+                        <p id="sidebar-regno" class="text-xs text-gray-500">Session Active</p>
+                        </div>
                 </div>
-                <button id="logoutBtn" class="mt-4 sm:mt-0 py-2 px-4 border rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                 <button id="fetchTimetableBtn" class="w-full flex justify-center py-2 px-4 border rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50">View Timetable</button>
-                 <button id="fetchGradesBtn" class="w-full flex justify-center py-2 px-4 border rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">View Grades</button>
-                 <button id="fetchAttendanceBtn" class="w-full flex justify-center py-2 px-4 border rounded-md shadow-sm text-sm font-medium text-white bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50">View Attendance</button>
-            </div>
-            <div id="dataContainer" class="mt-6 overflow-x-auto bg-gray-50 p-4 rounded-lg border">
-                </div>
         </div>
-    </div>
+        <nav class="p-4 space-y-2">
+            <a href="#" class="nav-link active flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="dashboard">
+                <i data-lucide="layout-dashboard" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+                Dashboard
+            </a>
+            
+            <div x-data="{ open: true }">
+                <button @click="open = !open" class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="academics">
+                    <div class="flex items-center">
+                       <i data-lucide="graduation-cap" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+                        Academics
+                    </div>
+                    <i data-lucide="chevron-down" class="h-5 w-5 transition-transform" :class="{'rotate-180': open}"></i>
+                </button>
+                <div x-show="open" class="pl-8 space-y-1 mt-1">
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 active-subsection" data-subsection="academics-courses">My Courses</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-timetable">Time Table</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-grades">Grades & Performance</a>
+                </div>
+            </div>
+            
+            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="enrollment">
+                <i data-lucide="book-marked" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+                Course Enrollment
+            </a>
+            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="hostel">
+                <i data-lucide="home" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+                Hostel Life
+            </a>
+             <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="profile">
+                <i data-lucide="user" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+                My Profile
+            </a>
+        </nav>
+        <div class="p-4 absolute bottom-0 w-full border-t border-gray-200">
+             <a href="#" id="logoutBtn" class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-red-100 hover:text-red-600 group">
+                <i data-lucide="log-out" class="mr-3 h-5 w-5 text-gray-500 group-hover:text-red-600"></i>
+                Logout
+            </a>
+        </div>
+    </aside>
 
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <header class="flex items-center justify-between p-4 bg-white border-b border-gray-200">
+            <div class="flex items-center">
+                 <button id="menu-toggle" class="md:hidden mr-4 text-gray-600 hover:text-gray-900">
+                    <i data-lucide="menu" class="h-6 w-6"></i>
+                </button>
+                <div class="relative">
+                     <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
+                    <input type="text" placeholder="Global Search..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+            <div class="flex items-center space-x-5">
+                 <button class="text-gray-600 hover:text-gray-900 relative">
+                    <i data-lucide="bell" class="h-6 w-6"></i>
+                    <span class="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">3</span>
+                </button>
+                <button id="theme-toggle" class="text-gray-600 hover:text-gray-900">
+                    <i data-lucide="sun" class="h-6 w-6 block dark:hidden"></i>
+                    <i data-lucide="moon" class="h-6 w-6 hidden dark:block"></i>
+                </button>
+            </div>
+        </header>
+        
+        <div id="content" class="flex-1 p-6 lg:p-8 overflow-y-auto">
+            
+            <div id="dashboard" class="page-section">
+                 <h2 class="text-3xl font-bold text-gray-800 mb-6">Dashboard</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                     <div class="card p-5 flex flex-col justify-center items-center text-center bg-indigo-500 text-white hover:bg-indigo-600">
+                        <i data-lucide="zap" class="h-10 w-10 mb-3"></i>
+                        <h3 class="font-semibold text-lg">Quick Actions</h3>
+                        <div class="mt-4 space-y-2">
+                           <button class="w-full text-sm bg-indigo-400 hover:bg-white hover:text-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">View Attendance</button>
+                           <button class="w-full text-sm bg-indigo-400 hover:bg-white hover:text-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Check Grades</button>
+                           <button class="w-full text-sm bg-indigo-400 hover:bg-white hover:text-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Register for Courses</button>
+                        </div>
+                    </div>
+                    <div class="card p-5">
+                        <h3 class="font-semibold text-lg mb-4 flex items-center"><i data-lucide="pie-chart" class="h-5 w-5 mr-2 text-indigo-500"></i>Academic Snapshot</h3>
+                        <div class="space-y-4 text-sm">
+                            <div>
+                                <div class="flex justify-between font-medium"><span>CGPA</span><span>8.75</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-green-500 h-2.5 rounded-full" style="width: 87.5%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between font-medium"><span>Completed Credits</span><span>120 / 160</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-blue-500 h-2.5 rounded-full" style="width: 75%"></div></div>
+                            </div>
+                             <div>
+                                <div class="flex justify-between font-medium"><span>Attendance</span><span>92%</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-yellow-400 h-2.5 rounded-full" style="width: 92%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="card p-5 md:col-span-2">
+                        <h3 class="font-semibold text-lg mb-4 flex items-center"><i data-lucide="calendar" class="h-5 w-5 mr-2 text-indigo-500"></i>Today's Schedule</h3>
+                         
+                         <div id="today-schedule-container" class="space-y-3">
+                            <p class="text-sm text-gray-500">Loading today's schedule...</p>
+                         </div>
+                         </div>
+                </div>
+            </div>
+
+            <div id="academics" class="hidden page-section">
+                <div id="academics-courses" class="academics-subsection">
+                    <div id="courses-container" class="card p-6">
+                        <p class="text-sm text-gray-500 flex items-center">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                            Loading your courses...
+                        </p>
+                    </div>
+                </div>
+                
+                <div id="academics-timetable" class="hidden academics-subsection">
+                    <div id="timetable-container" class="card p-6 overflow-x-auto">
+                         <p class="text-sm text-gray-500 flex items-center">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                            Loading your timetable...
+                        </p>
+                    </div>
+                </div>
+                <div id="academics-grades" class="hidden academics-subsection">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6">Grades & Performance</h2>
+                    <div class="card p-6">
+                         <p>Placeholder for Grades...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="enrollment" class="hidden page-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Course Enrollment</h2>
+                <div class="card p-6 mt-6">
+                    <h3 class="font-semibold text-xl mb-4">Additional Registrations</h3>
+                    <div class="space-y-3">
+                        <a href="#" class="flex justify-between items-center p-3 rounded-lg hover:bg-gray-100"><span>EXC Registration</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                        <a href="#" class="flex justify-between items-center p-3 rounded-lg hover:bg-gray-100"><span>WishList Registration</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div id="hostel" class="hidden page-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Hostel Life</h2>
+                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="card p-6 lg:col-span-2">
+                        <h3 class="font-semibold text-xl mb-4 flex items-center"><i data-lucide="bed-double" class="h-5 w-5 mr-2 text-indigo-500"></i>My Room Information</h3>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div><span class="font-medium text-gray-500">Hostel Block:</span> MH-A</div>
+                            <div><span class="font-medium text-gray-500">Room Number:</span> 404</div>
+                            <div><span class="font-medium text-gray-500">Room Type:</span> 2-Bed AC</div>
+                            <div><span class="font-medium text-gray-500">Roommate:</span> John Smith</div>
+                        </div>
+                         <button class="mt-4 w-full text-sm bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Online Booking</button>
+                    </div>
+                    <div class="card p-6 flex flex-col items-center justify-center text-center">
+                        <h3 class="font-semibold text-lg mb-2">Hostel Attendance</h3>
+                        <p class="text-4xl font-bold text-green-500">98%</p>
+                        <a href="#" class="text-xs text-indigo-500 hover:underline mt-1">View Attendance Log</a>
+                    </div>
+                 </div>
+            </div>
+            <div id="profile" class="hidden page-section">
+                 <h2 class="text-3xl font-bold text-gray-800 mb-6">My Profile</h2>
+                 <div class="card p-6">
+                    <p>Placeholder for Profile...</p>
+                 </div>
+            </div>
+
+        </div>
+    </main>
+    
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
     <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 </html>

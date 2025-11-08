@@ -1,17 +1,19 @@
-# VITCClone/data_routes.py
 from flask import Blueprint, jsonify, request, render_template
 from bs4 import BeautifulSoup
 import requests
 import warnings
 
 from session_manager import session_storage
-from parser import parse_course_data
+from parser import parse_course_data # Make sure this imports your updated parser
 
 warnings.filterwarnings('ignore', category=requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 data_bp = Blueprint('data_bp', __name__)
 
 TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
+GRADES_TARGET = 'examinations/examGradeView/doStudentGradeView'
+ATTENDANCE_TARGET = 'processViewStudentAttendance'
+
 
 @data_bp.route('/fetch-data', methods=['POST'])
 def fetch_data():
@@ -35,7 +37,11 @@ def fetch_data():
         
         csrf_token_tag = soup.find('input', {'name': '_csrf'})
         if not csrf_token_tag:
+            # If CSRF is not found, the session is likely dead.
+            if session_id in session_storage:
+                del session_storage[session_id]
             return jsonify({'status': 'session_expired', 'message': 'Session expired. Please log out and log in again.'}), 401
+        
         csrf_token = csrf_token_tag['value']
         print("   > Successfully retrieved CSRF token.")
 
@@ -56,6 +62,7 @@ def fetch_data():
             if not semester_select_tag:
                 raise ValueError("Could not find semester dropdown on the timetable page.")
             
+            # Find the first valid (non-empty) semester ID
             semester_sub_id = None
             for option in semester_select_tag.find_all('option'):
                 if option.get('value') and len(option.get('value')) > 0:
@@ -74,19 +81,35 @@ def fetch_data():
             
             print("   > Parsing timetable data and rendering custom template.")
             parsed_data = parse_course_data(data_res.text)
-            rendered_html = render_template('timetable_display.html', data=parsed_data)
-            return jsonify({'status': 'success', 'html_content': rendered_html})
+            
+            # Render the partial template
+            rendered_html = render_template('timetable_content.html', data=parsed_data)
+            
+            # --- THIS IS THE KEY CHANGE ---
+            # Send BOTH the rendered HTML and the raw JSON data
+            return jsonify({
+                'status': 'success', 
+                'html_content': rendered_html,
+                'raw_data': parsed_data 
+            })
         
         else:
+            # --- GENERIC HANDLER FOR OTHER BUTTONS ---
             print(f"   > Performing generic fetch for target: {target}")
             payload = {'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}
             headers = {'X-Requested-With': 'XMLHttpRequest'}
             data_res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
             data_res.raise_for_status()
+            
+            # You can add more parsers and partials here later
+            # For now, just return the raw HTML
             return jsonify({'status': 'success', 'html_content': data_res.text})
 
     except Exception as e:
         print(f"   > CRITICAL ERROR in '/fetch-data': {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'status': 'failure', 'message': str(e)}), 500
+        # If any request fails, assume session is dead
+        if session_id in session_storage:
+            del session_storage[session_id]
+        return jsonify({'status': 'session_expired', 'message': str(e)}), 401

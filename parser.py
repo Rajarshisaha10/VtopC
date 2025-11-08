@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import json
 
 # Set this to True to save parser output to a file, False for production
-DEBUG = False
+DEBUG = True
 
 def parse_course_data(html_content):
     if not html_content:
