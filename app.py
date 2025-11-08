@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for
 from flask_cors import CORS
 import os
 
@@ -15,12 +15,16 @@ app.register_blueprint(data_bp)
 
 @app.route('/')
 def index():
-    """Serves the main frontend page."""
-    return render_template('frontend.html')
+    """Serves the main dashboard page."""
+    # This is now the protected dashboard
+    return render_template('dashboard.html')
+
+@app.route('/login')
+def login():
+    """Serves the login page."""
+    # This is the new, public login page
+    return render_template('login.html')
 
 if __name__ == '__main__':
-    # This block is for production environments like Render.
-    # It gets the port number from an environment variable, which Render sets automatically.
-    # The host '0.0.0.0' makes the app accessible from outside its container.
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
