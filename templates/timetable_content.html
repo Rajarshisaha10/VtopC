@@ -83,7 +83,7 @@
             {% endfor %}
 
             {% for slot in time_slot_keys %}
-                {% set row = loop.index + 1 %} <div class="timetable-time sticky left-0 z-10 p-2 text-right text-xs font-mono border-b border-r bg-white" style="grid-row: {{ row }}; grid-column: 1;">
+                {% set row = loop.index + 1 %} <div class="timetable-time sticky -left-6 z-10 p-2 text-right text-xs font-mono border-b border-r bg-white" style="grid-row: {{ row }}; grid-column: 1;">
                     {{ slot.split(' - ')[0] }}
                 </div>
                 
