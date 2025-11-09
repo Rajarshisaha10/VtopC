@@ -1,6 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
     const API_BASE_URL = window.location.origin;
 
+    // --- API Targets ---
+    const TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn';
+    const GRADES_TARGET = 'examinations/examGradeView/StudentGradeView';
+    const ATTENDANCE_TARGET = 'processViewStudentAttendance';
+    const CALENDAR_TARGET = 'academics/common/CalendarPreview';
+    const CURRICULUM_TARGET = 'student/viewMyCurriculum'; // Placeholder
+    const PROJECTS_TARGET = 'student/studentProjectView'; // Placeholder
+    const ENROLLMENT_TARGET = 'courseManagement/studentCourseRegister'; // Placeholder
+    const HOSTEL_TARGET = 'hostels/student/leave/1';
+    const PROFILE_TARGET = 'student/studentProfileView'; // Placeholder
+
+
     // --- Sidebar/Nav Elements ---
     const menuToggle = document.getElementById('menu-toggle');
     const sidebar = document.getElementById('sidebar');
@@ -15,10 +27,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logoutBtn');
     const sidebarUsername = document.getElementById('sidebar-username');
     const sidebarRegNo = document.getElementById('sidebar-regno');
+    const contentContainer = document.getElementById('content'); // Main content area
+    
+    // --- Containers for dynamic content ---
+    const todayScheduleContainer = document.getElementById('today-schedule-container');
     const timetableContainer = document.getElementById('timetable-container');
     const coursesContainer = document.getElementById('courses-container');
-    const contentContainer = document.getElementById('content'); // Main content area
-    const todayScheduleContainer = document.getElementById('today-schedule-container'); // Container from dashboard
+    const attendanceContainer = document.getElementById('attendance-container');
+    const gradesContainer = document.getElementById('grades-container');
+    const curriculumContainer = document.getElementById('curriculum-container');
+    const projectsContainer = document.getElementById('projects-container');
+    const calendarContainer = document.getElementById('calendar-container');
+    const enrollmentContainer = document.getElementById('enrollment-container');
+    const hostelContainer = document.getElementById('hostel-container');
+    const profileContainer = document.getElementById('profile-container');
+
 
     // --- Page/Section Navigation ---
     
@@ -31,7 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
             l.classList.toggle('active', l.dataset.section === sectionId);
         });
         
-        // Special handling for academics parent button
         academicsToggle.classList.toggle('active', sectionId === 'academics');
         if (academicsSubmenu) {
             academicsSubmenu.classList.toggle('hidden', sectionId !== 'academics');
@@ -55,14 +77,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const sectionId = link.dataset.section;
             showPageSection(sectionId);
 
+            // --- Handle fetching data for main sections ---
             if (sectionId === 'academics') {
-                // Default to the first subsection if main academics is clicked
                 showAcademicsSubsection('academics-courses');
+                // Data for 'academics-courses' is loaded by default by fetchTimetableAndCourses
+            } else if (sectionId === 'enrollment') {
+                fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer);
+            } else if (sectionId === 'hostel') {
+                fetchAndDisplay(HOSTEL_TARGET, hostelContainer);
+            } else if (sectionId === 'profile') {
+                fetchAndDisplay(PROFILE_TARGET, profileContainer);
             }
 
             if (window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
-            
-            // Scroll to top of content area
             contentContainer.scrollTop = 0;
         });
     });
@@ -71,11 +98,27 @@ document.addEventListener('DOMContentLoaded', () => {
     academicsNavLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
+            const subsectionId = link.dataset.subsection;
             showPageSection('academics'); // Ensure main academics section is visible
-            showAcademicsSubsection(link.dataset.subsection);
+            showAcademicsSubsection(subsectionId);
+
+            // --- Handle fetching data for subsections ---
+            if (subsectionId === 'academics-timetable') {
+                // This is already loaded by the initial fetch, but we can re-fetch if needed
+                // Or just leave it, since fetchTimetableAndCourses() populates it.
+            } else if (subsectionId === 'academics-grades') {
+                fetchAndDisplay(GRADES_TARGET, gradesContainer);
+            } else if (subsectionId === 'academics-attendance') {
+                fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer);
+            } else if (subsectionId === 'academics-calendar') {
+                fetchAndDisplay(CALENDAR_TARGET, calendarContainer);
+            } else if (subsectionId === 'academics-curriculum') {
+                fetchAndDisplay(CURRICULUM_TARGET, curriculumContainer);
+            } else if (subsectionId === 'academics-projects') {
+                fetchAndDisplay(PROJECTS_TARGET, projectsContainer);
+            }
+
             if (window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
-            
-            // Scroll to top of content area
             contentContainer.scrollTop = 0;
         });
     });
@@ -85,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar.classList.toggle('-translate-x-full');
     });
 
-    // Dark mode toggle (from index.html)
+    // Dark mode toggle
     const themeToggle = document.getElementById('theme-toggle');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
@@ -101,15 +144,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Data Fetching & Session Logic ---
 
+    function handleFetchError(error, container) {
+        console.error('Fetch error:', error);
+        localStorage.removeItem('vtop_session_id');
+        window.location.href = '/login';
+    }
+
+    /**
+     * Generic function to fetch data for a target and put it in a container.
+     */
+    async function fetchAndDisplay(target, containerElement) {
+        containerElement.innerHTML = `<p class="text-sm text-gray-500 flex items-center">
+            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+            Loading...
+        </p>`;
+        lucide.createIcons(); // Render the loader icon
+
+        try {
+            const currentSessionId = localStorage.getItem('vtop_session_id');
+            if (!currentSessionId) throw new Error("No session ID");
+
+            const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    session_id: currentSessionId, 
+                    target: target 
+                })
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) { // Session expired
+                    throw new Error("Session expired. Redirecting to login.");
+                }
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                containerElement.innerHTML = data.html_content;
+                lucide.createIcons(); // Re-render icons in the new content
+            } else {
+                 throw new Error(data.message || "Failed to fetch data.");
+            }
+
+        } catch (error) {
+            handleFetchError(error, containerElement);
+        }
+    }
+
+
     /**
      * Checks if the user's session is valid.
-     * If yes, populates user info and fetches data.
-     * If no, redirects to login.
      */
     async function checkSession() {
         const savedSessionId = localStorage.getItem('vtop_session_id');
         if (!savedSessionId) {
-            window.location.href = '/login'; // Redirect to login if no session
+            window.location.href = '/login'; 
             return;
         }
 
@@ -124,11 +215,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.status === 'success') {
-                // Populate user info
                 sidebarUsername.textContent = data.username;
-                sidebarRegNo.textContent = data.username; // Use username as placeholder
+                sidebarRegNo.textContent = data.username; 
                 
-                // Fetch the real data
+                // Fetch the default data (timetable, courses, dashboard card)
                 fetchTimetableAndCourses(); 
             } else {
                 localStorage.removeItem('vtop_session_id');
@@ -152,21 +242,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     session_id: currentSessionId, 
-                    target: 'academics/common/StudentTimeTableChn' 
+                    target: TIMETABLE_TARGET 
                 })
             });
 
             if (!response.ok) {
                 if (response.status === 401) { // Session expired
-                    localStorage.removeItem('vtop_session_id');
-                    window.location.href = '/login';
+                    throw new Error("Session expired. Redirecting to login.");
                 }
                 throw new Error(`Server error: ${response.status}`);
             }
 
             const data = await response.json();
             if (data.status === 'success') {
-                // --- INJECT RENDERED HTML ---
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(data.html_content, 'text/html');
                 
@@ -174,33 +262,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 const timetableContent = doc.getElementById('weekly-timetable-content');
 
                 if (coursesContent) {
-                    coursesContainer.innerHTML = ''; // Clear spinner
+                    coursesContainer.innerHTML = ''; 
                     coursesContainer.appendChild(coursesContent);
                 } else {
                     coursesContainer.innerHTML = '<p class="text-red-500">Could not parse registered courses.</p>';
                 }
                 
                 if (timetableContent) {
-                    timetableContainer.innerHTML = ''; // Clear spinner
+                    timetableContainer.innerHTML = ''; 
                     timetableContainer.appendChild(timetableContent);
                 } else {
                     timetableContainer.innerHTML = '<p class="text-red-500">Could not parse timetable.</p>';
                 }
                 
-                // --- POPULATE DASHBOARD CARD ---
-                // Pass the raw JSON data to the new function
                 populateTodaySchedule(data.raw_data.timetable);
-
+                lucide.createIcons(); // Re-render icons
 
             } else {
                  throw new Error(data.message || "Failed to fetch data.");
             }
 
         } catch (error) {
-            const errorMsg = `<p class="text-red-500 text-center">Error: ${error.message}. Please try logging out and back in.</p>`;
-            timetableContainer.innerHTML = errorMsg;
-            coursesContainer.innerHTML = errorMsg;
-            todayScheduleContainer.innerHTML = errorMsg;
+            handleFetchError(error, timetableContainer);
+            if (coursesContainer) handleFetchError(error, coursesContainer);
+            if (todayScheduleContainer) handleFetchError(error, todayScheduleContainer);
         }
     }
     
@@ -209,6 +294,11 @@ document.addEventListener('DOMContentLoaded', () => {
      * and builds the HTML for the "Today's Schedule" card.
      */
     function populateTodaySchedule(timetableData) {
+        if (!timetableData) {
+             todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">Could not load timetable data for dashboard card.</p>';
+             return;
+        }
+        
         const time_slot_keys = [
             "08:00 - 08:50", "08:55 - 09:45", "09:50 - 10:40", "10:45 - 11:35",
             "11:40 - 12:30", "12:35 - 13:25", "LUNCH", "14:00 - 14:50",
@@ -225,19 +315,14 @@ document.addEventListener('DOMContentLoaded', () => {
         let finalHtml = '';
 
         time_slot_keys.forEach((slotKey, index) => {
-            // Check if a class exists at this slot and has a 'rowspan'
-            // (meaning it's the start of a class)
             if (todaySchedule && todaySchedule[slotKey] && todaySchedule[slotKey].rowspan) {
                 classCount++;
                 const course = todaySchedule[slotKey];
                 const rowspan = course.rowspan;
-
-                // Calculate start and end times
                 const startTime = slotKey.split(' - ')[0];
                 const endIndex = index + rowspan - 1;
                 const endTime = time_slot_keys[endIndex].split(' - ')[1];
 
-                // Build the HTML card
                 finalHtml += `
                     <div class="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100">
                         <div class="w-16 text-center border-r border-gray-200 pr-3">
@@ -276,11 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Initialize Page ---
-    lucide.createIcons(); // Create icons
-    
-    // Initial setup to show Dashboard by default
+    lucide.createIcons();
     showPageSection('dashboard');
-    
-    // Check session (this also triggers data load)
     checkSession();
 });

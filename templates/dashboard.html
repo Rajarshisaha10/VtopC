@@ -182,7 +182,11 @@
                 <div x-show="open" class="pl-8 space-y-1 mt-1">
                     <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 active-subsection" data-subsection="academics-courses">My Courses</a>
                     <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-timetable">Time Table</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-attendance">Attendance</a>
                     <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-grades">Grades & Performance</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-curriculum">My Curriculum</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-projects">Projects & Research</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-calendar">Academic Calendar</a>
                 </div>
             </div>
             
@@ -289,49 +293,76 @@
                         </p>
                     </div>
                 </div>
+
+                <div id="academics-attendance" class="hidden academics-subsection">
+                    <div id="attendance-container" class="card p-6">
+                         <p class="text-sm text-gray-500 flex items-center">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                            Loading your attendance...
+                        </p>
+                    </div>
+                </div>
+
                 <div id="academics-grades" class="hidden academics-subsection">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">Grades & Performance</h2>
-                    <div class="card p-6">
-                         <p>Placeholder for Grades...</p>
+                    <div id="grades-container" class="card p-6">
+                         <p class="text-sm text-gray-500 flex items-center">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                            Loading your grades...
+                        </p>
+                    </div>
+                </div>
+
+                <div id="academics-curriculum" class="hidden academics-subsection">
+                    <div id="curriculum-container" class="card p-6">
+                         <p class="text-sm text-gray-500 flex items-center">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                            Loading your curriculum...
+                        </p>
+                    </div>
+                </div>
+                
+                <div id="academics-projects" class="hidden academics-subsection">
+                    <div id="projects-container" class="card p-6">
+                         <p class="text-sm text-gray-500 flex items-center">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                            Loading your projects...
+                        </p>
+                    </div>
+                </div>
+
+                <div id="academics-calendar" class="hidden academics-subsection">
+                    <div id="calendar-container" class="card p-6">
+                         <p class="text-sm text-gray-500 flex items-center">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                            Loading academic calendar...
+                        </p>
                     </div>
                 </div>
             </div>
 
             <div id="enrollment" class="hidden page-section">
-                <h2 class="text-3xl font-bold text-gray-800 mb-6">Course Enrollment</h2>
-                <div class="card p-6 mt-6">
-                    <h3 class="font-semibold text-xl mb-4">Additional Registrations</h3>
-                    <div class="space-y-3">
-                        <a href="#" class="flex justify-between items-center p-3 rounded-lg hover:bg-gray-100"><span>EXC Registration</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
-                        <a href="#" class="flex justify-between items-center p-3 rounded-lg hover:bg-gray-100"><span>WishList Registration</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
-                    </div>
+                <div id="enrollment-container" class="card p-6">
+                    <p class="text-sm text-gray-500 flex items-center">
+                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                        Loading course enrollment page...
+                    </p>
                 </div>
             </div>
             <div id="hostel" class="hidden page-section">
-                <h2 class="text-3xl font-bold text-gray-800 mb-6">Hostel Life</h2>
-                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="card p-6 lg:col-span-2">
-                        <h3 class="font-semibold text-xl mb-4 flex items-center"><i data-lucide="bed-double" class="h-5 w-5 mr-2 text-indigo-500"></i>My Room Information</h3>
-                        <div class="grid grid-cols-2 gap-4 text-sm">
-                            <div><span class="font-medium text-gray-500">Hostel Block:</span> MH-A</div>
-                            <div><span class="font-medium text-gray-500">Room Number:</span> 404</div>
-                            <div><span class="font-medium text-gray-500">Room Type:</span> 2-Bed AC</div>
-                            <div><span class="font-medium text-gray-500">Roommate:</span> John Smith</div>
-                        </div>
-                         <button class="mt-4 w-full text-sm bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Online Booking</button>
-                    </div>
-                    <div class="card p-6 flex flex-col items-center justify-center text-center">
-                        <h3 class="font-semibold text-lg mb-2">Hostel Attendance</h3>
-                        <p class="text-4xl font-bold text-green-500">98%</p>
-                        <a href="#" class="text-xs text-indigo-500 hover:underline mt-1">View Attendance Log</a>
-                    </div>
-                 </div>
+                <div id="hostel-container" class="card p-6">
+                    <p class="text-sm text-gray-500 flex items-center">
+                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                        Loading hostel page...
+                    </p>
+                </div>
             </div>
             <div id="profile" class="hidden page-section">
-                 <h2 class="text-3xl font-bold text-gray-800 mb-6">My Profile</h2>
-                 <div class="card p-6">
-                    <p>Placeholder for Profile...</p>
-                 </div>
+                <div id="profile-container" class="card p-6">
+                    <p class="text-sm text-gray-500 flex items-center">
+                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                        Loading your profile...
+                    </p>
+                </div>
             </div>
 
         </div>
