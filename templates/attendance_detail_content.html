@@ -1,0 +1,32 @@
+<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+    <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-100 dark:bg-gray-700 dark:text-gray-200 sticky top-0">
+            <tr>
+                <th class="py-3 px-4">Sl.No</th>
+                <th class="py-3 px-4">Date</th>
+                <th class="py-3 px-4">Slot</th>
+                <th class="py-3 px-4">Timing</th>
+                <th class="py-3 px-4">Status</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% if details %}
+                {% for detail in details %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="py-3 px-4">{{ detail.sl_no }}</td>
+                    <td class="py-3 px-4">{{ detail.date }}</td>
+                    <td class="py-3 px-4">{{ detail.slot }}</td>
+                    <td class="py-3 px-4">{{ detail.timing }}</td>
+                    <td class="py-3 px-4 font-semibold {% if detail.status == 'Absent' %}text-red-600{% else %}text-green-600{% endif %}">
+                        {{ detail.status }}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5" class="py-4 px-4 text-center text-gray-500">No detailed attendance data found.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>

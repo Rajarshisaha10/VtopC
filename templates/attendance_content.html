@@ -3,6 +3,58 @@
         My Attendance
     </h2>
     <div class="card p-6 overflow-x-auto bg-white">
-        <pre class="whitespace-pre-wrap">{{ data_html | safe }}</pre>
+        <div class="table-responsive">
+            <table class="w-full text-sm text-left text-gray-600">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                    <tr>
+                        <th class="py-3 px-4">Sl.No</th>
+                        <th class="py-3 px-4">Course Code</th>
+                        <th class="py-3 px-4">Course Title</th>
+                        <th class="py-3 px-4">Type</th>
+                        <th class="py-3 px-4">Slot</th>
+                        <th class="py-3 px-4">Faculty</th>
+                        <th class="py-3 px-4 text-center">Attended</th>
+                        <th class="py-3 px-4 text-center">Total</th>
+                        <th class="py-3 px-4 text-center">Percent</th>
+                        <th class="py-3 px-4 text-center">Details</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% if courses %}
+                        {% for course in courses %}
+                        <tr class="bg-white hover:bg-gray-50">
+                            <td class="py-3 px-4">{{ course.sl_no }}</td>
+                            <td class="py-3 px-4 font-mono">{{ course.course_code }}</td>
+                            <td class="py-3 px-4">{{ course.course_title }}</td>
+                            <td class="py-3 px-4">{{ course.course_type }}</td>
+                            <td class="py-3 px-4">{{ course.slot }}</td>
+                            <td class-="py-3 px-4 text-xs">{{ course.faculty }}</td>
+                            <td class="py-3 px-4 text-center">{{ course.attended_classes }}</td>
+                            <td class="py-3 px-4 text-center">{{ course.total_classes }}</td>
+                            <td class="py-3 px-4 text-center font-bold 
+                                {% if course.percentage | int >= 75 %}text-green-600
+                                {% else %}text-red-600{% endif %}">
+                                {{ course.percentage }}%
+                            </td>
+                            <td class="py-3 px-4 text-center">
+                                {% if course.class_id %}
+                                <button class="view-attendance-detail text-indigo-600 hover:underline text-xs font-medium"
+                                        data-class-id="{{ course.class_id }}"
+                                        data-slot="{{ course.slot_param }}"
+                                        data-course-title="{{ course.course_title }}">
+                                    View
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr class="bg-white">
+                            <td colspan="10" class="py-4 px-4 text-center text-gray-500">No attendance data found.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>
