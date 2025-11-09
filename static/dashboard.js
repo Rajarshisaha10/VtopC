@@ -6,12 +6,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const GRADES_TARGET = 'examinations/examGradeView/StudentGradeView';
     const ATTENDANCE_TARGET = 'processViewStudentAttendance';
     const CALENDAR_TARGET = 'academics/common/CalendarPreview';
-    const CURRICULUM_TARGET = 'student/viewMyCurriculum'; // Placeholder
-    const PROJECTS_TARGET = 'student/studentProjectView'; // Placeholder
+    const CURRICULUM_TARGET = 'student/viewMyCurriculum'; 
+    const PROJECTS_TARGET = 'student/studentProjectView'; 
     const ENROLLMENT_TARGET = 'courseManagement/studentCourseRegister'; 
     const HOSTEL_TARGET = 'hostels/student/leave/1';
     const PROFILE_TARGET = 'student/studentProfileView';
 
+    // --- State ---
+    let currentSemesterId = null;
 
     // --- Sidebar/Nav Elements ---
     const menuToggle = document.getElementById('menu-toggle');
@@ -22,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const academicsSubsections = document.querySelectorAll('.academics-subsection');
     const academicsToggle = document.querySelector('[data-section="academics"]');
     const academicsSubmenu = academicsToggle.nextElementSibling;
+    const semesterSelect = document.getElementById('semester-select');
     
     // --- Data-specific Elements ---
     const logoutBtn = document.getElementById('logoutBtn');
@@ -41,6 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const enrollmentContainer = document.getElementById('enrollment-container');
     const hostelContainer = document.getElementById('hostel-container');
     const profileContainer = document.getElementById('profile-container');
+    
+    // Store all containers for easy clearing
+    const allDataContainers = [
+        todayScheduleContainer, timetableContainer, coursesContainer,
+        attendanceContainer, gradesContainer, curriculumContainer,
+        projectsContainer, calendarContainer, enrollmentContainer,
+        hostelContainer, profileContainer
+    ];
 
     // --- Modal Elements ---
     const modal = document.getElementById('detail-modal');
@@ -49,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalBody = document.getElementById('modal-body');
     const modalCloseBtn = document.getElementById('modal-close-btn');
 
-
+    
     // --- Page/Section Navigation ---
     
     function showPageSection(sectionId) {
@@ -77,6 +88,77 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function getActivePage() {
+        const activeNav = document.querySelector('.nav-link.active');
+        const activeSubNav = document.querySelector('.academics-nav-link.active-subsection');
+        
+        if (activeNav && activeNav.dataset.section !== 'academics') {
+            return { type: 'section', id: activeNav.dataset.section };
+        }
+        if (activeSubNav) {
+            return { type: 'subsection', id: activeSubNav.dataset.subsection };
+        }
+        return { type: 'section', id: 'dashboard' }; // Default
+    }
+
+    function clearAllDataContainers() {
+        allDataContainers.forEach(container => {
+            if (container) {
+                container.innerHTML = ''; // Clear content
+            }
+        });
+        // Add a loader to the dashboard card specifically
+        if (todayScheduleContainer) {
+            todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">Loading today\'s schedule...</p>';
+        }
+    }
+
+    function refreshCurrentPage() {
+        clearAllDataContainers();
+        const activePage = getActivePage();
+
+        if (activePage.type === 'section') {
+            switch (activePage.id) {
+                case 'dashboard':
+                    fetchTimetableAndCourses(); // This reloads dashboard card + courses
+                    break;
+                case 'enrollment':
+                    fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
+                    break;
+                case 'hostel':
+                    fetchAndDisplay(HOSTEL_TARGET, hostelContainer, "Hostel");
+                    break;
+                case 'profile':
+                    fetchAndDisplay(PROFILE_TARGET, profileContainer, "Profile");
+                    break;
+            }
+        } else if (activePage.type === 'subsection') {
+            switch (activePage.id) {
+                case 'academics-courses':
+                    fetchTimetableAndCourses(); // This reloads courses
+                    break;
+                case 'academics-timetable':
+                    fetchTimetableAndCourses(); // This reloads timetable
+                    break;
+                case 'academics-grades':
+                    fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
+                    break;
+                case 'academics-attendance':
+                    fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
+                    break;
+                case 'academics-calendar':
+                    fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar");
+                    break;
+                case 'academics-curriculum':
+                    fetchAndDisplay(CURRICULUM_TARGET, curriculumContainer, "My Curriculum");
+                    break;
+                case 'academics-projects':
+                    fetchAndDisplay(PROJECTS_TARGET, projectsContainer, "Projects");
+                    break;
+            }
+        }
+    }
+
     // Main navigation
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
@@ -86,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (sectionId === 'academics') {
                 showAcademicsSubsection('academics-courses');
+                fetchAndDisplay(TIMETABLE_TARGET, coursesContainer, "My Courses"); // Already loaded, but good to be explicit
             } else if (sectionId === 'enrollment') {
                 fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
             } else if (sectionId === 'hostel') {
@@ -118,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (subsectionId === 'academics-projects') {
                 fetchAndDisplay(PROJECTS_TARGET, projectsContainer, "Projects");
             }
+            // No fetch needed for courses/timetable, they are loaded by default
 
             if (window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
             contentContainer.scrollTop = 0;
@@ -173,7 +257,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     session_id: currentSessionId, 
-                    target: target 
+                    target: target,
+                    semesterSubId: currentSemesterId // Send selected semester
                 })
             });
 
@@ -218,7 +303,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.status === 'success') {
                 sidebarUsername.textContent = data.username;
                 sidebarRegNo.textContent = data.username; 
-                fetchTimetableAndCourses(); 
+                // First, populate the semester dropdown
+                populateSemesterDropdown(); 
             } else {
                 localStorage.removeItem('vtop_session_id');
                 window.location.href = '/login';
@@ -229,7 +315,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function populateSemesterDropdown() {
+        try {
+            const currentSessionId = localStorage.getItem('vtop_session_id');
+            const response = await fetch(`${API_BASE_URL}/get-semesters`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: currentSessionId })
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch semesters');
+            
+            const data = await response.json();
+            
+            if (data.status === 'success' && data.semesters.length > 0) {
+                semesterSelect.innerHTML = ''; // Clear "Loading..."
+                data.semesters.forEach(semester => {
+                    const option = document.createElement('option');
+                    option.value = semester.id;
+                    option.textContent = semester.name;
+                    semesterSelect.appendChild(option);
+                });
+                
+                // Set the current semester to the first one (default)
+                currentSemesterId = data.semesters[0].id;
+                
+                // Now that we have the semester, load the default page content
+                fetchTimetableAndCourses();
+            } else {
+                throw new Error(data.message || 'Could not load semesters');
+            }
+        } catch (error) {
+            semesterSelect.innerHTML = '<option>Error loading</option>';
+            console.error("Failed to populate semesters:", error);
+        }
+    }
+
+
     async function fetchTimetableAndCourses() {
+        if (!currentSemesterId) {
+            console.log("Waiting for semester ID...");
+            return;
+        }
+        
         // This function now only loads the timetable, courses, and dashboard card
         try {
             const currentSessionId = localStorage.getItem('vtop_session_id');
@@ -238,7 +366,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     session_id: currentSessionId, 
-                    target: TIMETABLE_TARGET 
+                    target: TIMETABLE_TARGET,
+                    semesterSubId: currentSemesterId // Send selected semester
                 })
             });
 
@@ -313,7 +442,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const rowspan = course.rowspan;
                 const startTime = slotKey.split(' - ')[0];
                 const endIndex = index + rowspan - 1;
-                const endTime = time_slot_keys[endIndex].split(' - ')[1];
+                // Handle cases where class might run past the end of the array
+                const endTime = (time_slot_keys[endIndex] || "N/A").split(' - ')[1];
 
                 finalHtml += `
                     <div class="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600">
@@ -375,7 +505,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ 
                     session_id: currentSessionId, 
                     class_id: classId,
-                    slot: slot
+                    slot: slot,
+                    semesterSubId: currentSemesterId // Send selected semester
                 })
             });
 
@@ -411,6 +542,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
+    // --- EVENT LISTENERS ---
+
+    // Semester change listener
+    semesterSelect.addEventListener('change', () => {
+        currentSemesterId = semesterSelect.value;
+        console.log(`Semester changed to: ${currentSemesterId}`);
+        refreshCurrentPage();
+    });
+
     // Logout listener
     logoutBtn.addEventListener('click', async (e) => { 
         e.preventDefault();
@@ -428,5 +568,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialize Page ---
     lucide.createIcons();
     showPageSection('dashboard');
-    checkSession();
+    checkSession(); // This will now trigger populateSemesterDropdown, which then triggers fetchTimetableAndCourses
 });

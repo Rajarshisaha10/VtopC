@@ -56,7 +56,7 @@
         .dark .text-gray-500 {
             color: #9ca3af;
         }
-        .dark input:not([disabled]) {
+        .dark input:not([disabled]), .dark select:not([disabled]) {
             background-color: #374151;
             border-color: #4b5563;
             color: #f9fafb;
@@ -149,85 +149,101 @@
             transform: rotate(90deg); 
         }
         /* --- END STYLES FROM TIMETABLE --- */
+        
+        /* --- MODAL STYLES --- */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden">
-    <aside id="sidebar" class="sidebar bg-white text-gray-800 w-64 fixed inset-y-0 left-0 z-30 overflow-y-auto shadow-lg md:relative md:translate-x-0 transform -translate-x-full border-r border-gray-200">
-        <div class="p-5 border-b border-gray-200">
-            <h1 class="text-2xl font-bold text-indigo-600">VTOP Client</h1>
+    <aside id="sidebar" class="sidebar bg-white text-gray-800 w-64 fixed inset-y-0 left-0 z-30 overflow-y-auto shadow-lg md:relative md:translate-x-0 transform -translate-x-full border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+            <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">VTOP Client</h1>
             <div class="mt-4">
                 <div class="flex items-center">
                     <img class="h-12 w-12 rounded-full object-cover" src="https://placehold.co/100x100/6366f1/white?text=U" alt="User Avatar">
                     <div class="ml-3">
-                        <p id="sidebar-username" class="text-sm font-semibold text-gray-900">Loading...</p>
-                        <p id="sidebar-regno" class="text-xs text-gray-500">Session Active</p>
+                        <p id="sidebar-username" class="text-sm font-semibold text-gray-900 dark:text-white">Loading...</p>
+                        <p id="sidebar-regno" class="text-xs text-gray-500 dark:text-gray-400">Session Active</p>
                         </div>
                 </div>
             </div>
         </div>
         <nav class="p-4 space-y-2">
-            <a href="#" class="nav-link active flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="dashboard">
-                <i data-lucide="layout-dashboard" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+            <a href="#" class="nav-link active flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group dark:text-gray-300 dark:hover:bg-indigo-500" data-section="dashboard">
+                <i data-lucide="layout-dashboard" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white dark:text-indigo-400 dark:group-hover:text-white"></i>
                 Dashboard
             </a>
             
             <div x-data="{ open: true }">
-                <button @click="open = !open" class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="academics">
+                <button @click="open = !open" class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group dark:text-gray-300 dark:hover:bg-indigo-500" data-section="academics">
                     <div class="flex items-center">
-                       <i data-lucide="graduation-cap" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+                       <i data-lucide="graduation-cap" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white dark:text-indigo-400 dark:group-hover:text-white"></i>
                         Academics
                     </div>
                     <i data-lucide="chevron-down" class="h-5 w-5 transition-transform" :class="{'rotate-180': open}"></i>
                 </button>
                 <div x-show="open" class="pl-8 space-y-1 mt-1">
-                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 active-subsection" data-subsection="academics-courses">My Courses</a>
-                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-timetable">Time Table</a>
-                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-attendance">Attendance</a>
-                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-grades">Grades & Performance</a>
-                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-curriculum">My Curriculum</a>
-                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-projects">Projects & Research</a>
-                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100" data-subsection="academics-calendar">Academic Calendar</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 active-subsection dark:hover:bg-gray-700" data-subsection="academics-courses">My Courses</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 dark:hover:bg-gray-700" data-subsection="academics-timetable">Time Table</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 dark:hover:bg-gray-700" data-subsection="academics-attendance">Attendance</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 dark:hover:bg-gray-700" data-subsection="academics-grades">Grades & Performance</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 dark:hover:bg-gray-700" data-subsection="academics-curriculum">My Curriculum</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 dark:hover:bg-gray-700" data-subsection="academics-projects">Projects & Research</a>
+                    <a href="#" class="academics-nav-link block px-4 py-2 text-xs rounded-md hover:bg-gray-100 dark:hover:bg-gray-700" data-subsection="academics-calendar">Academic Calendar</a>
                 </div>
             </div>
             
-            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="enrollment">
-                <i data-lucide="book-marked" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group dark:text-gray-300 dark:hover:bg-indigo-500" data-section="enrollment">
+                <i data-lucide="book-marked" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white dark:text-indigo-400 dark:group-hover:text-white"></i>
                 Course Enrollment
             </a>
-            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="hostel">
-                <i data-lucide="home" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group dark:text-gray-300 dark:hover:bg-indigo-500" data-section="hostel">
+                <i data-lucide="home" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white dark:text-indigo-400 dark:group-hover:text-white"></i>
                 Hostel Life
             </a>
-             <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group" data-section="profile">
-                <i data-lucide="user" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white"></i>
+             <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group dark:text-gray-300 dark:hover:bg-indigo-500" data-section="profile">
+                <i data-lucide="user" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white dark:text-indigo-400 dark:group-hover:text-white"></i>
                 My Profile
             </a>
         </nav>
-        <div class="p-4 absolute bottom-0 w-full border-t border-gray-200">
-             <a href="#" id="logoutBtn" class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-red-100 hover:text-red-600 group">
-                <i data-lucide="log-out" class="mr-3 h-5 w-5 text-gray-500 group-hover:text-red-600"></i>
+        
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+            <label for="semester-select" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Semester</label>
+            <select id="semester-select" class="block w-full p-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-indigo-500 dark:focus:border-indigo-500">
+                <option>Loading...</option>
+            </select>
+        </div>
+        
+        <div class="p-4 absolute bottom-0 w-full border-t border-gray-200 dark:border-gray-700">
+             <a href="#" id="logoutBtn" class="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-red-100 hover:text-red-600 group dark:text-gray-300 dark:hover:bg-red-900/20 dark:hover:text-red-400">
+                <i data-lucide="log-out" class="mr-3 h-5 w-5 text-gray-500 group-hover:text-red-600 dark:text-gray-400 dark:group-hover:text-red-400"></i>
                 Logout
             </a>
         </div>
     </aside>
 
     <main class="flex-1 flex flex-col overflow-hidden">
-        <header class="flex items-center justify-between p-4 bg-white border-b border-gray-200">
+        <header class="flex items-center justify-between p-4 bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
             <div class="flex items-center">
-                 <button id="menu-toggle" class="md:hidden mr-4 text-gray-600 hover:text-gray-900">
+                 <button id="menu-toggle" class="md:hidden mr-4 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                     <i data-lucide="menu" class="h-6 w-6"></i>
                 </button>
                 <div class="relative">
                      <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"></i>
-                    <input type="text" placeholder="Global Search..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" placeholder="Global Search..." class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                 </div>
             </div>
             <div class="flex items-center space-x-5">
-                 <button class="text-gray-600 hover:text-gray-900 relative">
+                 <button class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white relative">
                     <i data-lucide="bell" class="h-6 w-6"></i>
                     <span class="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">3</span>
                 </button>
-                <button id="theme-toggle" class="text-gray-600 hover:text-gray-900">
+                <button id="theme-toggle" class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                     <i data-lucide="sun" class="h-6 w-6 block dark:hidden"></i>
                     <i data-lucide="moon" class="h-6 w-6 hidden dark:block"></i>
                 </button>
@@ -237,7 +253,7 @@
         <div id="content" class="flex-1 p-6 lg:p-8 overflow-y-auto">
             
             <div id="dashboard" class="page-section">
-                 <h2 class="text-3xl font-bold text-gray-800 mb-6">Dashboard</h2>
+                 <h2 class="text-3xl font-bold text-gray-800 dark:text-white mb-6">Dashboard</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                      <div class="card p-5 flex flex-col justify-center items-center text-center bg-indigo-500 text-white hover:bg-indigo-600">
                         <i data-lucide="zap" class="h-10 w-10 mb-3"></i>
@@ -269,7 +285,7 @@
                         <h3 class="font-semibold text-lg mb-4 flex items-center"><i data-lucide="calendar" class="h-5 w-5 mr-2 text-indigo-500"></i>Today's Schedule</h3>
                          
                          <div id="today-schedule-container" class="space-y-3">
-                            <p class="text-sm text-gray-500">Loading today's schedule...</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Loading today's schedule...</p>
                          </div>
                          </div>
                 </div>
@@ -277,63 +293,63 @@
 
             <div id="academics" class="hidden page-section">
                 <div id="academics-courses" class="academics-subsection">
-                    <div id="courses-container" class="card p-6">
-                        <p class="text-sm text-gray-500 flex items-center">
-                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                    <div id="courses-container">
+                        <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                             Loading your courses...
                         </p>
                     </div>
                 </div>
                 
                 <div id="academics-timetable" class="hidden academics-subsection">
-                    <div id="timetable-container" class="card p-6 overflow-x-auto">
-                         <p class="text-sm text-gray-500 flex items-center">
-                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                    <div id="timetable-container" class="overflow-x-auto">
+                         <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                             Loading your timetable...
                         </p>
                     </div>
                 </div>
 
                 <div id="academics-attendance" class="hidden academics-subsection">
-                    <div id="attendance-container" class="card p-6">
-                         <p class="text-sm text-gray-500 flex items-center">
-                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                    <div id="attendance-container">
+                         <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                             Loading your attendance...
                         </p>
                     </div>
                 </div>
 
                 <div id="academics-grades" class="hidden academics-subsection">
-                    <div id="grades-container" class="card p-6">
-                         <p class="text-sm text-gray-500 flex items-center">
-                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                    <div id="grades-container">
+                         <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                             Loading your grades...
                         </p>
                     </div>
                 </div>
 
                 <div id="academics-curriculum" class="hidden academics-subsection">
-                    <div id="curriculum-container" class="card p-6">
-                         <p class="text-sm text-gray-500 flex items-center">
-                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                    <div id="curriculum-container">
+                         <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                             Loading your curriculum...
                         </p>
                     </div>
                 </div>
                 
                 <div id="academics-projects" class="hidden academics-subsection">
-                    <div id="projects-container" class="card p-6">
-                         <p class="text-sm text-gray-500 flex items-center">
-                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                    <div id="projects-container">
+                         <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                             Loading your projects...
                         </p>
                     </div>
                 </div>
 
                 <div id="academics-calendar" class="hidden academics-subsection">
-                    <div id="calendar-container" class="card p-6">
-                         <p class="text-sm text-gray-500 flex items-center">
-                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                    <div id="calendar-container">
+                         <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                            <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                             Loading academic calendar...
                         </p>
                     </div>
@@ -341,25 +357,25 @@
             </div>
 
             <div id="enrollment" class="hidden page-section">
-                <div id="enrollment-container" class="card p-6">
-                    <p class="text-sm text-gray-500 flex items-center">
-                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                <div id="enrollment-container">
+                    <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                         Loading course enrollment page...
                     </p>
                 </div>
             </div>
             <div id="hostel" class="hidden page-section">
-                <div id="hostel-container" class="card p-6">
-                    <p class="text-sm text-gray-500 flex items-center">
-                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                <div id="hostel-container">
+                    <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                         Loading hostel page...
                     </p>
                 </div>
             </div>
             <div id="profile" class="hidden page-section">
-                <div id="profile-container" class="card p-6">
-                    <p class="text-sm text-gray-500 flex items-center">
-                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i>
+                <div id="profile-container">
+                    <p class="text-sm text-gray-500 flex items-center dark:text-gray-400">
+                        <i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400"></i>
                         Loading your profile...
                     </p>
                 </div>
@@ -367,12 +383,6 @@
 
         </div>
     </main>
-    
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-    
-    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
-    
-</main>
     
     <div id="detail-modal" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 hidden opacity-0">
         <div class="modal-content bg-white dark:bg-gray-800 w-full max-w-2xl rounded-lg shadow-xl transform scale-95 opacity-0">
@@ -387,6 +397,7 @@
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     
     <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
