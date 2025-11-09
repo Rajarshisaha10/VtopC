@@ -68,13 +68,35 @@ def parse_course_data(html_content):
         "18:35 - 19:25"
     ]
     
-    if len(timetable_tables) > 1:
-        schedule_table = timetable_tables[1]
+    # --- *** NEW LOGIC AS REQUESTED *** ---
+    # Find the correct table instead of assuming it's the second one.
+    schedule_table = None
+    day_headers = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN", "THEORY", "LAB"}
+    for table in timetable_tables:
+        # Check the first <td> or <th> of the first few rows
+        for row in table.find_all('tr', limit=10): # Check first 10 rows
+            first_cell = row.find(['th', 'td'])
+            if first_cell:
+                cell_text = first_cell.get_text(strip=True)
+                # If we find a day or "THEORY", this is the correct table
+                if cell_text in day_headers:
+                    schedule_table = table
+                    break
+        if schedule_table:
+            break
+    
+    # Check if we found the correct table
+    if schedule_table:
+        if DEBUG: print("   > [DEBUG] Found the correct schedule table by content ('MON'/'THEORY').")
         all_rows = schedule_table.find_all('tr')
+        # --- *** END OF NEW LOGIC *** ---
+        
         current_day = ""
         for row in all_rows:
             cells = row.find_all('td')
             if not cells: continue
+            
+            # This logic remains the same
             if 'rowspan' in cells[0].attrs:
                 current_day = cells[0].get_text(strip=True)
                 data_cells = cells[2:]
@@ -110,8 +132,10 @@ def parse_course_data(html_content):
                                 if slot_key != "LUNCH":
                                     raw_timetable_data[current_day][slot_key] = class_info
                 col_idx += colspan
+    else:
+        if DEBUG: print("   > [DEBUG] Could not find the correct schedule table. Timetable will be empty.")
 
-    # --- Part 3: PROCESS DATA TO CALCULATE ROWSPAN ---
+    # --- Part 3: PROCESS DATA TO CALCULATE ROWSPAN (Unchanged) ---
     processed_timetable = {day: {} for day in ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']}
     
     for day in raw_timetable_data:
