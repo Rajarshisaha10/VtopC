@@ -17,7 +17,16 @@
                     <td class="py-3 px-4">{{ detail.date }}</td>
                     <td class="py-3 px-4">{{ detail.slot }}</td>
                     <td class="py-3 px-4">{{ detail.timing }}</td>
-                    <td class="py-3 px-4 font-semibold {% if detail.status == 'Absent' %}text-red-600{% else %}text-green-600{% endif %}">
+                    
+                    <td class="py-3 px-4 font-semibold 
+                        {% if detail.status == 'Absent' %}
+                            text-red-600
+                        {% elif detail.status == 'On Duty' %}
+                            text-yellow-600 dark:text-yellow-400
+                        {% else %}
+                            text-green-600
+                        {% endif %}
+                    ">
                         {{ detail.status }}
                     </td>
                 </tr>
