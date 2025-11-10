@@ -231,12 +231,12 @@ def fetch_attendance_detail():
         return jsonify({'status': 'session_expired', 'message': str(e)}), 401
 
 
-# *** NEW ROUTE FOR OD SNAPSHOT ***
 @data_bp.route('/get-od-snapshot', methods=['POST'])
 def get_od_snapshot():
     """
     Fetches attendance summary, then loops through each course to
     fetch its details and sum up all "On Duty" entries.
+    Lab OD counts as 2.
     """
     data = request.json
     session_id = data.get('session_id')
@@ -267,6 +267,9 @@ def get_od_snapshot():
         for course in course_list:
             if not course.get('class_id') or not course.get('slot_param'):
                 continue
+                
+            # *** MODIFICATION: Check if the course is a lab ***
+            is_lab = 'LAB' in course.get('course_type', '').upper()
             
             # Need to get a fresh CSRF token for each loop
             session, username, csrf_token, base_url = get_session_details(session_id)
@@ -280,22 +283,26 @@ def get_od_snapshot():
             }
             
             try:
-                print(f"   > Fetching details for {course['course_code']}...")
+                print(f"   > Fetching details for {course['course_code']} (Is Lab: {is_lab})...")
                 detail_res = session.post(f"{base_url}/{ATTENDANCE_DETAIL_TARGET}", data=detail_payload, headers=headers, verify=False)
                 detail_res.raise_for_status()
                 
                 detail_data = parse_attendance_detail(detail_res.text)
                 
                 for detail in detail_data:
+                    # *** MODIFICATION: Apply new OD counting logic ***
                     if detail.get('status') == 'On Duty':
-                        total_od += 1
+                        if is_lab:
+                            total_od += 2
+                        else:
+                            total_od += 1
                         
             except Exception as e:
                 print(f"   > WARN: Could not fetch detail for {course['course_code']}. {e}")
                 # Continue to the next course even if one fails
                 continue
         
-        print(f"   > Total OD count found: {total_od}")
+        print(f"   > Total OD count found (with lab logic): {total_od}")
         return jsonify({'status': 'success', 'total_od_count': total_od})
 
     except Exception as e:
