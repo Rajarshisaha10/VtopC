@@ -148,10 +148,9 @@ def fetch_data():
 
             parsed_data = parse_attendance_summary(data_res.text)
             rendered_html = render_template('attendance_content.html', courses=parsed_data)
-            # *** FEATURE: Added raw_data to the response ***
             return jsonify({
                 'status': 'success', 
-                'html_content': rendered_html, 
+                'html_content': rendered_html,
                 'raw_data': parsed_data
             })
         
@@ -225,6 +224,82 @@ def fetch_attendance_detail():
 
     except Exception as e:
         print(f"   > CRITICAL ERROR in '/fetch-attendance-detail': {e}")
+        import traceback
+        traceback.print_exc()
+        if 'session_id' in locals() and session_id in session_storage:
+            del session_storage[session_id]
+        return jsonify({'status': 'session_expired', 'message': str(e)}), 401
+
+
+# *** NEW ROUTE FOR OD SNAPSHOT ***
+@data_bp.route('/get-od-snapshot', methods=['POST'])
+def get_od_snapshot():
+    """
+    Fetches attendance summary, then loops through each course to
+    fetch its details and sum up all "On Duty" entries.
+    """
+    data = request.json
+    session_id = data.get('session_id')
+    semester_sub_id = data.get('semesterSubId')
+    
+    try:
+        session, username, csrf_token, base_url = get_session_details(session_id)
+        headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': f"{base_url}/content"
+        }
+
+        # 1. Get the list of courses from the attendance summary page
+        print(f"\n--- Fetching OD Snapshot for {username} (Sem: {semester_sub_id}) ---")
+        summary_payload = {'authorizedID': username, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
+        summary_res = session.post(f"{base_url}/{ATTENDANCE_TARGET}", data=summary_payload, headers=headers, verify=False)
+        summary_res.raise_for_status()
+        
+        course_list = parse_attendance_summary(summary_res.text)
+        
+        if not course_list:
+            print("   > No courses found in attendance summary.")
+            return jsonify({'status': 'success', 'total_od_count': 0})
+
+        total_od = 0
+        
+        # 2. Loop through each course and fetch its details
+        for course in course_list:
+            if not course.get('class_id') or not course.get('slot_param'):
+                continue
+            
+            # Need to get a fresh CSRF token for each loop
+            session, username, csrf_token, base_url = get_session_details(session_id)
+            
+            detail_payload = {
+                'authorizedID': username,
+                '_csrf': csrf_token,
+                'lSemesterSubId': semester_sub_id, 
+                'classId': course['class_id'],
+                'slotName': course['slot_param']
+            }
+            
+            try:
+                print(f"   > Fetching details for {course['course_code']}...")
+                detail_res = session.post(f"{base_url}/{ATTENDANCE_DETAIL_TARGET}", data=detail_payload, headers=headers, verify=False)
+                detail_res.raise_for_status()
+                
+                detail_data = parse_attendance_detail(detail_res.text)
+                
+                for detail in detail_data:
+                    if detail.get('status') == 'On Duty':
+                        total_od += 1
+                        
+            except Exception as e:
+                print(f"   > WARN: Could not fetch detail for {course['course_code']}. {e}")
+                # Continue to the next course even if one fails
+                continue
+        
+        print(f"   > Total OD count found: {total_od}")
+        return jsonify({'status': 'success', 'total_od_count': total_od})
+
+    except Exception as e:
+        print(f"   > CRITICAL ERROR in '/get-od-snapshot': {e}")
         import traceback
         traceback.print_exc()
         if 'session_id' in locals() and session_id in session_storage:

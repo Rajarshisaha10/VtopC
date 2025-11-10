@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageSections = document.querySelectorAll('.page-section');
     const academicsNavLinks = document.querySelectorAll('.academics-nav-link');
     const academicsSubsections = document.querySelectorAll('.academics-subsection');
-    const academicsToggle = document.querySelector('[x-data="{ open: true }"] button'); // More specific selector
+    const academicsToggle = document.querySelector('[data-section="academics"]');
     const academicsSubmenu = academicsToggle.nextElementSibling;
     const semesterSelect = document.getElementById('semester-select');
     
@@ -45,9 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const hostelContainer = document.getElementById('hostel-container');
     const profileContainer = document.getElementById('profile-container');
     
-    // --- *** FEATURE: Add snapshot elements *** ---
+    // --- Snapshot Elements ---
     const snapshotAttPerc = document.getElementById('snapshot-attendance-perc');
     const snapshotAttBar = document.getElementById('snapshot-attendance-bar');
+    const snapshotOdCount = document.getElementById('snapshot-od-count');
+    const snapshotOdBar = document.getElementById('snapshot-od-bar');
 
     // Store all containers for easy clearing
     const allDataContainers = [
@@ -112,9 +114,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // --- *** FEATURE: Reset snapshot elements *** ---
+        // --- Reset snapshot elements ---
         if (snapshotAttPerc) snapshotAttPerc.textContent = '...';
         if (snapshotAttBar) snapshotAttBar.style.width = '0%';
+        if (snapshotOdCount) snapshotOdCount.textContent = '... / 40';
+        if (snapshotOdBar) snapshotOdBar.style.width = '0%';
         
         // Add a loader to the dashboard card specifically
         if (todayScheduleContainer) {
@@ -130,7 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (activePage.id) {
                 case 'dashboard':
                     fetchTimetableAndCourses(); // This reloads dashboard card + courses
-                    fetchAndCalculateAttendanceSnapshot(); // --- *** FEATURE: Add this call *** ---
+                    fetchAndCalculateAttendanceSnapshot();
+                    fetchAndDisplayODSnapshot(); // --- *** ADDED THIS CALL *** ---
                     break;
                 case 'enrollment':
                     fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
@@ -171,10 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Main navigation
     navLinks.forEach(link => {
-        // --- *** BUG FIX: Check if the link is the academics toggle *** ---
+        // --- BUG FIX: Check if the link is the academics toggle ---
         if (link === academicsToggle) {
             // This is the dropdown button, let Alpine.js handle it.
-            // We DON'T add the page navigation listener.
             return;
         }
 
@@ -183,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const sectionId = link.dataset.section;
             showPageSection(sectionId);
 
-            // This block is now only for non-academics links
             if (sectionId === 'enrollment') {
                 fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
             } else if (sectionId === 'hostel') {
@@ -202,8 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const subsectionId = link.dataset.subsection;
-            showPageSection('academics'); // Show the parent "academics" page
-            showAcademicsSubsection(subsectionId); // Show the specific subsection
+            showPageSection('academics'); 
+            showAcademicsSubsection(subsectionId);
 
             if (subsectionId === 'academics-grades') {
                 fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
@@ -357,7 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Now that we have the semester, load the default page content
                 fetchTimetableAndCourses();
-                fetchAndCalculateAttendanceSnapshot(); // --- *** FEATURE: Add this call *** ---
+                fetchAndCalculateAttendanceSnapshot();
+                fetchAndDisplayODSnapshot(); // --- *** ADDED THIS CALL *** ---
             } else {
                 throw new Error(data.message || 'Could not load semesters');
             }
@@ -367,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- *** FEATURE: New function for attendance snapshot *** ---
+
     async function fetchAndCalculateAttendanceSnapshot() {
         if (!currentSemesterId) return; // Wait for semester
 
@@ -417,6 +421,44 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error calculating attendance snapshot:', error);
             if (snapshotAttPerc) snapshotAttPerc.textContent = 'Err';
+        }
+    }
+
+    // --- *** NEW FUNCTION FOR OD SNAPSHOT *** ---
+    async function fetchAndDisplayODSnapshot() {
+        if (!currentSemesterId) return;
+
+        // Set loading state
+        if (snapshotOdCount) snapshotOdCount.textContent = '... / 40';
+        if (snapshotOdBar) snapshotOdBar.style.width = '0%';
+
+        try {
+            const currentSessionId = localStorage.getItem('vtop_session_id');
+            const response = await fetch(`${API_BASE_URL}/get-od-snapshot`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    session_id: currentSessionId, 
+                    semesterSubId: currentSemesterId 
+                })
+            });
+            if (!response.ok) throw new Error('Failed to fetch OD data');
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                const odCount = data.total_od_count;
+                const odPercentage = (odCount / 40) * 100;
+                
+                if (snapshotOdCount && snapshotOdBar) {
+                    snapshotOdCount.textContent = `${odCount} / 40`;
+                    snapshotOdBar.style.width = `${Math.min(odPercentage, 100)}%`; // Cap at 100%
+                }
+            } else {
+                throw new Error(data.message || 'Failed to get OD count');
+            }
+        } catch (error) {
+            console.error('Error fetching OD snapshot:', error);
+            if (snapshotOdCount) snapshotOdCount.textContent = 'Err / 40';
         }
     }
 
