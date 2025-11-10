@@ -21,7 +21,6 @@ CALENDAR_TARGET = 'academics/common/CalendarPreview'
 ENROLLMENT_TARGET = 'courseManagement/studentCourseRegister'
 HOSTEL_TARGET = 'hostels/student/leave/1'
 PROFILE_TARGET = 'student/studentProfileView'
-# New endpoint for attendance detail
 ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
 
 
