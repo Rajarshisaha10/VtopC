@@ -180,7 +180,7 @@
             </a>
             
             <div x-data="{ open: true }">
-                <button @click="open = !open" class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group dark:text-gray-300 dark:hover:bg-indigo-500" data-section="academics">
+                <button @click="open = !open" class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-500 hover:text-white group dark:text-gray-300 dark:hover:bg-indigo-500">
                     <div class="flex items-center">
                        <i data-lucide="graduation-cap" class="mr-3 h-5 w-5 text-indigo-500 group-hover:text-white dark:text-indigo-400 dark:group-hover:text-white"></i>
                         Academics
@@ -276,8 +276,8 @@
                                 <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-blue-500 h-2.5 rounded-full" style="width: 75%"></div></div>
                             </div>
                              <div>
-                                <div class="flex justify-between font-medium"><span>Attendance</span><span>92%</span></div>
-                                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div class="bg-yellow-400 h-2.5 rounded-full" style="width: 92%"></div></div>
+                                <div class="flex justify-between font-medium"><span>Attendance</span><span id="snapshot-attendance-perc">...</span></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1"><div id="snapshot-attendance-bar" class="bg-yellow-400 h-2.5 rounded-full" style="width: 0%"></div></div>
                             </div>
                         </div>
                     </div>

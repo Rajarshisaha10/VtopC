@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageSections = document.querySelectorAll('.page-section');
     const academicsNavLinks = document.querySelectorAll('.academics-nav-link');
     const academicsSubsections = document.querySelectorAll('.academics-subsection');
-    const academicsToggle = document.querySelector('[data-section="academics"]');
+    const academicsToggle = document.querySelector('[x-data="{ open: true }"] button'); // More specific selector
     const academicsSubmenu = academicsToggle.nextElementSibling;
     const semesterSelect = document.getElementById('semester-select');
     
@@ -45,6 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const hostelContainer = document.getElementById('hostel-container');
     const profileContainer = document.getElementById('profile-container');
     
+    // --- *** FEATURE: Add snapshot elements *** ---
+    const snapshotAttPerc = document.getElementById('snapshot-attendance-perc');
+    const snapshotAttBar = document.getElementById('snapshot-attendance-bar');
+
     // Store all containers for easy clearing
     const allDataContainers = [
         todayScheduleContainer, timetableContainer, coursesContainer,
@@ -72,9 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
             l.classList.toggle('active', l.dataset.section === sectionId);
         });
         
-        academicsToggle.classList.toggle('active', sectionId === 'academics');
-        if (academicsSubmenu) {
-            academicsSubmenu.classList.toggle('hidden', sectionId !== 'academics');
+        // Ensure the main "Academics" button stays visually active when a subsection is
+        if (academicsToggle && academicsToggle.parentElement) {
+             academicsToggle.classList.toggle('active', sectionId === 'academics');
         }
     }
 
@@ -107,6 +111,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 container.innerHTML = ''; // Clear content
             }
         });
+        
+        // --- *** FEATURE: Reset snapshot elements *** ---
+        if (snapshotAttPerc) snapshotAttPerc.textContent = '...';
+        if (snapshotAttBar) snapshotAttBar.style.width = '0%';
+        
         // Add a loader to the dashboard card specifically
         if (todayScheduleContainer) {
             todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">Loading today\'s schedule...</p>';
@@ -121,6 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             switch (activePage.id) {
                 case 'dashboard':
                     fetchTimetableAndCourses(); // This reloads dashboard card + courses
+                    fetchAndCalculateAttendanceSnapshot(); // --- *** FEATURE: Add this call *** ---
                     break;
                 case 'enrollment':
                     fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
@@ -161,15 +171,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Main navigation
     navLinks.forEach(link => {
+        // --- *** BUG FIX: Check if the link is the academics toggle *** ---
+        if (link === academicsToggle) {
+            // This is the dropdown button, let Alpine.js handle it.
+            // We DON'T add the page navigation listener.
+            return;
+        }
+
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const sectionId = link.dataset.section;
             showPageSection(sectionId);
 
-            if (sectionId === 'academics') {
-                showAcademicsSubsection('academics-courses');
-                fetchAndDisplay(TIMETABLE_TARGET, coursesContainer, "My Courses"); // Already loaded, but good to be explicit
-            } else if (sectionId === 'enrollment') {
+            // This block is now only for non-academics links
+            if (sectionId === 'enrollment') {
                 fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
             } else if (sectionId === 'hostel') {
                 fetchAndDisplay(HOSTEL_TARGET, hostelContainer, "Hostel");
@@ -187,8 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const subsectionId = link.dataset.subsection;
-            showPageSection('academics'); 
-            showAcademicsSubsection(subsectionId);
+            showPageSection('academics'); // Show the parent "academics" page
+            showAcademicsSubsection(subsectionId); // Show the specific subsection
 
             if (subsectionId === 'academics-grades') {
                 fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
@@ -237,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchAndDisplay(target, containerElement, title) {
         // Don't re-fetch if content is already there and not just a loader
-        if (containerElement.querySelector('.card') || containerElement.querySelector('section')) {
+        if (containerElement.innerHTML.trim() !== '' && !containerElement.querySelector('[data-lucide="loader"]')) {
             console.log(`Content for ${title} already loaded.`);
             return;
         }
@@ -342,12 +357,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Now that we have the semester, load the default page content
                 fetchTimetableAndCourses();
+                fetchAndCalculateAttendanceSnapshot(); // --- *** FEATURE: Add this call *** ---
             } else {
                 throw new Error(data.message || 'Could not load semesters');
             }
         } catch (error) {
             semesterSelect.innerHTML = '<option>Error loading</option>';
             console.error("Failed to populate semesters:", error);
+        }
+    }
+
+    // --- *** FEATURE: New function for attendance snapshot *** ---
+    async function fetchAndCalculateAttendanceSnapshot() {
+        if (!currentSemesterId) return; // Wait for semester
+
+        try {
+            const currentSessionId = localStorage.getItem('vtop_session_id');
+            const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    session_id: currentSessionId, 
+                    target: ATTENDANCE_TARGET,
+                    semesterSubId: currentSemesterId 
+                })
+            });
+            if (!response.ok) throw new Error('Failed to fetch attendance');
+            
+            const data = await response.json();
+            if (data.status === 'success' && data.raw_data) {
+                let totalAttended = 0;
+                let totalConducted = 0;
+                
+                data.raw_data.forEach(course => {
+                    const attended = parseInt(course.attended_classes, 10);
+                    const total = parseInt(course.total_classes, 10);
+                    
+                    if (!isNaN(attended) && !isNaN(total)) {
+                        totalAttended += attended;
+                        totalConducted += total;
+                    }
+                });
+
+                let percentage = 0;
+                if (totalConducted > 0) {
+                    percentage = (totalAttended / totalConducted) * 100;
+                }
+
+                if (snapshotAttPerc && snapshotAttBar) {
+                    if (totalConducted === 0) {
+                        snapshotAttPerc.textContent = 'N/A';
+                        snapshotAttBar.style.width = '0%';
+                    } else {
+                        snapshotAttPerc.textContent = `${percentage.toFixed(0)}%`;
+                        snapshotAttBar.style.width = `${percentage.toFixed(0)}%`;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error calculating attendance snapshot:', error);
+            if (snapshotAttPerc) snapshotAttPerc.textContent = 'Err';
         }
     }
 
@@ -568,5 +637,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialize Page ---
     lucide.createIcons();
     showPageSection('dashboard');
-    checkSession(); // This will now trigger populateSemesterDropdown, which then triggers fetchTimetableAndCourses
+    checkSession(); // This will now trigger populateSemesterDropdown, which then triggers the data-fetching functions
 });

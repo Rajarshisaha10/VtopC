@@ -148,7 +148,12 @@ def fetch_data():
 
             parsed_data = parse_attendance_summary(data_res.text)
             rendered_html = render_template('attendance_content.html', courses=parsed_data)
-            return jsonify({'status': 'success', 'html_content': rendered_html})
+            # *** FEATURE: Added raw_data to the response ***
+            return jsonify({
+                'status': 'success', 
+                'html_content': rendered_html, 
+                'raw_data': parsed_data
+            })
         
         else:
             # --- GENERIC HANDLER FOR OTHER TARGETS (Calendar, Placeholders) ---
