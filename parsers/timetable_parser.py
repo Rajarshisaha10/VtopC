@@ -22,6 +22,7 @@ def parse_course_data(html_content):
 
     # --- 2. Parse Timetable Grid ---
     # This function now handles both new and old grid formats.
+    # FIX: Pass 'soup' object
     raw_timetable_data = _parse_timetable_grid(soup, course_title_map)
     
     # --- 3. Process Rowspans (Common to both formats) ---

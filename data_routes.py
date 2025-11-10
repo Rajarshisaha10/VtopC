@@ -5,6 +5,7 @@ import warnings
 import re
 
 from session_manager import session_storage
+# Updated parser imports
 from parsers.timetable_parser import parse_course_data
 from parsers.attendance_parser import parse_attendance_summary, parse_attendance_detail
 
@@ -20,6 +21,7 @@ CALENDAR_TARGET = 'academics/common/CalendarPreview'
 ENROLLMENT_TARGET = 'courseManagement/studentCourseRegister'
 HOSTEL_TARGET = 'hostels/student/leave/1'
 PROFILE_TARGET = 'student/studentProfileView'
+# New endpoint for attendance detail
 ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
 
 
@@ -35,7 +37,9 @@ def get_session_details(session_id):
     base_url = "https://vtopcc.vit.ac.in/vtop"
     
     # Get a fresh CSRF token
-    content_res = session.get(f"{base_url}/content", verify=False)
+    # Using 'content' page as the referrer, as seen in your network log
+    headers = {'Referer': f"{base_url}/content"}
+    content_res = session.get(f"{base_url}/content", verify=False, headers=headers)
     content_res.raise_for_status()
     soup = BeautifulSoup(content_res.text, 'html.parser')
     
@@ -57,7 +61,10 @@ def get_semesters():
     session_id = request.json.get('session_id')
     try:
         session, username, csrf_token, base_url = get_session_details(session_id)
-        headers = {'X-Requested-With': 'XMLHttpRequest'}
+        headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': f"{base_url}/content"
+            }
         
         print("\n--- Fetching Semester List ---")
         initial_tt_page_res = session.post(
@@ -99,7 +106,10 @@ def fetch_data():
 
     try:
         session, username, csrf_token, base_url = get_session_details(session_id)
-        headers = {'X-Requested-With': 'XMLHttpRequest'}
+        headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': f"{base_url}/content"
+            }
         print(f"\n--- Fetching '{target}' for {username} (Sem: {semester_sub_id}) ---")
 
         # All routes that need a semester ID must have it provided
@@ -124,15 +134,10 @@ def fetch_data():
 
         elif target == GRADES_TARGET:
             print(f"   > Fetching grades page: {target}")
-            # This is the *initial* page load. The *actual* grades require
-            # a POST to 'doStudentGradeView' with the semester ID.
-            # We will just load the page for now.
             payload = {'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}
             data_res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
             data_res.raise_for_status()
             
-            # You would need a new parser to find the grade data from the *actual*
-            # form submission, which would be a different request.
             rendered_html = render_template('grades_content.html', data_html=data_res.text)
             return jsonify({'status': 'success', 'html_content': rendered_html})
 
@@ -185,19 +190,24 @@ def fetch_attendance_detail():
     
     try:
         session, username, csrf_token, base_url = get_session_details(session_id)
-        headers = {'X-Requested-With': 'XMLHttpRequest'}
+        headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': f"{base_url}/content"
+            }
         
         if not semester_sub_id:
              return jsonify({'status': 'failure', 'message': 'Semester ID not provided.'}), 400
 
         print(f"\n--- Fetching attendance detail for {class_id} (Sem: {semester_sub_id}) ---")
         
+        # *** THIS IS THE FIX ***
+        # The key VTOP expects is 'slotName', not 'slot'
         payload = {
             'authorizedID': username,
             '_csrf': csrf_token,
-            'lSemesterSubId': semester_sub_id, # This is the correct key
+            'lSemesterSubId': semester_sub_id, 
             'classId': class_id,
-            'slot': slot
+            'slotName': slot  # <-- Changed from 'slot' to 'slotName'
         }
         
         data_res = session.post(f"{base_url}/{ATTENDANCE_DETAIL_TARGET}", data=payload, headers=headers, verify=False)
