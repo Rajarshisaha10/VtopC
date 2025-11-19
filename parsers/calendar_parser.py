@@ -37,7 +37,7 @@ def parse_academic_calendar(html_content):
             
         cells = row.find_all('td')
         
-        # Enumerate to get column index (0=Sun, 6=Sat)
+        # Enumerate to get column index (0=Sun, ... 6=Sat)
         for col_idx, cell in enumerate(cells):
             day_text = ""
             spans = cell.find_all('span')
@@ -63,14 +63,16 @@ def parse_academic_calendar(html_content):
             
             if day_text:
                 # --- Determine Overall Status for Color Coding ---
-                # Default to general (white/gray)
+                # Default to general (White/Empty)
                 status = 'general'
                 
                 # Priority 1: Explicit Holidays / No Instruction (Red)
+                # Matches "No Instructional Day", "Holiday", "Winter Vacation", "Pongal", etc.
                 if 'no instructional' in all_text_content or 'holiday' in all_text_content or 'vacation' in all_text_content:
                     status = 'holiday'
                 
-                # Priority 2: Day Orders (Yellow) - Takes precedence over generic "Instructional"
+                # Priority 2: Day Orders (Yellow) 
+                # Takes precedence over generic "Instructional"
                 elif 'order' in all_text_content:
                     status = 'day_order'
                 
@@ -78,12 +80,14 @@ def parse_academic_calendar(html_content):
                 elif 'instructional' in all_text_content or 'working' in all_text_content or 'fid' in all_text_content:
                     status = 'working'
                 
-                # Priority 4: Empty Weekends (Red)
-                # If status is still general (no events found above) and it's Sat(6) or Sun(0)
+                # Priority 4: Default Weekends (Red)
+                # ONLY if the day is purely empty.
+                # If it has text like "CAT - I" (which is 'general'), it stays 'general' (White).
                 elif status == 'general' and (col_idx == 0 or col_idx == 6):
-                    status = 'holiday'
                     if not events:
+                        status = 'holiday'
                         events.append({'text': 'Holiday'})
+                    # Else: keep as 'general' (White) because something is written there
 
                 calendar_data.append({
                     'day': int(day_text),
@@ -91,7 +95,7 @@ def parse_academic_calendar(html_content):
                     'events': events
                 })
             else:
-                # Empty padding cell
+                # Empty padding cell for start/end of month
                 calendar_data.append({'day': None, 'status': 'padding', 'events': []})
 
     return {
