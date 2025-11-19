@@ -2,12 +2,13 @@ from flask import Blueprint, jsonify, request, render_template
 from bs4 import BeautifulSoup
 import requests
 import warnings
+import datetime
 import re
 
 from session_manager import session_storage
-# Updated parser imports
 from parsers.timetable_parser import parse_course_data
 from parsers.attendance_parser import parse_attendance_summary, parse_attendance_detail
+from parsers.calendar_parser import parse_academic_calendar
 
 warnings.filterwarnings('ignore', category=requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
@@ -18,9 +19,7 @@ TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
 GRADES_TARGET = 'examinations/examGradeView/StudentGradeView'
 ATTENDANCE_TARGET = 'processViewStudentAttendance'
 CALENDAR_TARGET = 'academics/common/CalendarPreview'
-ENROLLMENT_TARGET = 'courseManagement/studentCourseRegister'
-HOSTEL_TARGET = 'hostels/student/leave/1'
-PROFILE_TARGET = 'student/studentProfileView'
+CALENDAR_VIEW_TARGET = 'processViewCalendar' # Endpoint for actual calendar data
 ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
 
 
@@ -35,65 +34,61 @@ def get_session_details(session_id):
     
     base_url = "https://vtopcc.vit.ac.in/vtop"
     
-    # Get a fresh CSRF token
-    # Using 'content' page as the referrer, as seen in your network log
-    headers = {'Referer': f"{base_url}/content"}
-    content_res = session.get(f"{base_url}/content", verify=False, headers=headers)
-    content_res.raise_for_status()
-    soup = BeautifulSoup(content_res.text, 'html.parser')
-    
-    csrf_token_tag = soup.find('input', {'name': '_csrf'})
-    if not csrf_token_tag:
+    # --- FIX: Fetch a fresh CSRF token from /content ---
+    # This is required for the Semester Dropdown and other requests to work.
+    try:
+        headers = {'Referer': f"{base_url}/content"}
+        content_res = session.get(f"{base_url}/content", verify=False, headers=headers)
+        content_res.raise_for_status()
+        soup = BeautifulSoup(content_res.text, 'html.parser')
+        
+        csrf_token_tag = soup.find('input', {'name': '_csrf'})
+        if not csrf_token_tag:
+            # Try to see if we are logged out
+            if session_id in session_storage:
+                del session_storage[session_id]
+            raise Exception("Session expired (CSRF missing).")
+            
+        csrf_token = csrf_token_tag['value']
+    except Exception as e:
+        print(f"Error fetching CSRF: {e}")
         if session_id in session_storage:
             del session_storage[session_id]
-        raise Exception("Session expired.")
-        
-    csrf_token = csrf_token_tag['value']
+        raise Exception("Session expired or network error.")
     
     return session, username, csrf_token, base_url
 
 @data_bp.route('/get-semesters', methods=['POST'])
 def get_semesters():
-    """
-    Fetches the list of all available semesters from the timetable page.
-    """
     session_id = request.json.get('session_id')
     try:
         session, username, csrf_token, base_url = get_session_details(session_id)
-        headers = {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': f"{base_url}/content"
-            }
+        headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
         
-        print("\n--- Fetching Semester List ---")
-        initial_tt_page_res = session.post(
+        # Hit timetable page to get semester dropdown
+        print("Fetching semester list...")
+        res = session.post(
             f"{base_url}/{TIMETABLE_TARGET}", 
             data={'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}, 
-            headers=headers,
-            verify=False
+            headers=headers, verify=False
         )
-        initial_tt_page_res.raise_for_status()
+        res.raise_for_status()
         
-        tt_soup = BeautifulSoup(initial_tt_page_res.text, 'html.parser')
-        semester_select_tag = tt_soup.find('select', {'id': 'semesterSubId'})
+        soup = BeautifulSoup(res.text, 'html.parser')
+        sem_select = soup.find('select', {'id': 'semesterSubId'})
         
         semesters = []
-        if semester_select_tag:
-            for option in semester_select_tag.find_all('option'):
-                value = option.get('value')
-                name = option.get_text(strip=True)
-                if value and len(value) > 0:
-                    semesters.append({'id': value, 'name': name})
-            print(f"   > Found {len(semesters)} semesters.")
-            return jsonify({'status': 'success', 'semesters': semesters})
+        if sem_select:
+            for opt in sem_select.find_all('option'):
+                if opt.get('value'):
+                    semesters.append({'id': opt['value'], 'name': opt.get_text(strip=True)})
         
-        raise ValueError("Could not find semester dropdown.")
+        print(f"Found {len(semesters)} semesters.")
+        return jsonify({'status': 'success', 'semesters': semesters})
 
     except Exception as e:
-        print(f"   > CRITICAL ERROR in '/get-semesters': {e}")
-        if 'session_id' in locals() and session_id in session_storage:
-            del session_storage[session_id]
-        return jsonify({'status': 'session_expired', 'message': str(e)}), 401
+        print(f"Error in get_semesters: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 401
 
 
 @data_bp.route('/fetch-data', methods=['POST'])
@@ -101,214 +96,150 @@ def fetch_data():
     data = request.json
     session_id = data.get('session_id')
     target = data.get('target')
-    semester_sub_id = data.get('semesterSubId') # Semester is now sent from client
+    semester_sub_id = data.get('semesterSubId')
+    
+    # Optional params for calendar navigation
+    cal_date = data.get('calDate') 
 
     try:
         session, username, csrf_token, base_url = get_session_details(session_id)
-        headers = {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': f"{base_url}/content"
-            }
-        print(f"\n--- Fetching '{target}' for {username} (Sem: {semester_sub_id}) ---")
-
-        # All routes that need a semester ID must have it provided
-        if not semester_sub_id and target in [TIMETABLE_TARGET, ATTENDANCE_TARGET, GRADES_TARGET]:
-             return jsonify({'status': 'failure', 'message': 'Semester ID not provided.'}), 400
+        headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
 
         if target == TIMETABLE_TARGET:
-            print("   > Fetching actual timetable data with Semester ID...")
             payload = {'authorizedID': username, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
-            data_res = session.post(f"{base_url}/processViewTimeTable", data=payload, headers=headers, verify=False)
-            data_res.raise_for_status()
-            
-            print("   > Parsing timetable data and rendering custom template.")
-            parsed_data = parse_course_data(data_res.text)
-            rendered_html = render_template('timetable_content.html', data=parsed_data)
-            
-            return jsonify({
-                'status': 'success', 
-                'html_content': rendered_html,
-                'raw_data': parsed_data 
-            })
-
-        elif target == GRADES_TARGET:
-            print(f"   > Fetching grades page: {target}")
-            payload = {'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}
-            data_res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
-            data_res.raise_for_status()
-            
-            rendered_html = render_template('grades_content.html', data_html=data_res.text)
-            return jsonify({'status': 'success', 'html_content': rendered_html})
+            res = session.post(f"{base_url}/processViewTimeTable", data=payload, headers=headers, verify=False)
+            parsed_data = parse_course_data(res.text)
+            html = render_template('timetable_content.html', data=parsed_data)
+            return jsonify({'status': 'success', 'html_content': html, 'raw_data': parsed_data})
 
         elif target == ATTENDANCE_TARGET:
-            print(f"   > Fetching attendance data: {target}")
             payload = {'authorizedID': username, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
-            data_res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
-            data_res.raise_for_status()
+            res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
+            parsed_data = parse_attendance_summary(res.text)
+            html = render_template('attendance_content.html', courses=parsed_data)
+            return jsonify({'status': 'success', 'html_content': html, 'raw_data': parsed_data})
+            
+        elif target == CALENDAR_TARGET:
+            # Calendar Logic
+            # 1. Default to current month if no date provided
+            if not cal_date:
+                now = datetime.datetime.now()
+                cal_date = now.strftime("01-%b-%Y").upper()
 
-            parsed_data = parse_attendance_summary(data_res.text)
-            rendered_html = render_template('attendance_content.html', courses=parsed_data)
-            return jsonify({
-                'status': 'success', 
-                'html_content': rendered_html,
-                'raw_data': parsed_data
-            })
-        
-        else:
-            # --- GENERIC HANDLER FOR OTHER TARGETS (Calendar, Placeholders) ---
-            print(f"   > Performing generic fetch for target: {target}")
+            print(f"Fetching Calendar for: {cal_date} Sem: {semester_sub_id}")
+            
+            # Payload for processViewCalendar based on your res.txt
+            # We assume classGroupId='COMB' (All Class Group) is generally safe/available
+            payload = {
+                'authorizedID': username, 
+                '_csrf': csrf_token, 
+                'calDate': cal_date,
+                'semSubId': semester_sub_id,
+                'classGroupId': 'ALL03', 
+                'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT")
+            }
+            
+            res = session.post(f"{base_url}/{CALENDAR_VIEW_TARGET}", data=payload, headers=headers, verify=False)
+            
+            parsed_data = parse_academic_calendar(res.text)
+            
+            # Calculate Navigation Dates
+            curr_dt = datetime.datetime.strptime(cal_date, "%d-%b-%Y")
+            # Next month: Add 32 days then go to day 1
+            next_month = (curr_dt + datetime.timedelta(days=32)).replace(day=1)
+            # Prev month: Subtract 1 day then go to day 1
+            prev_month = (curr_dt - datetime.timedelta(days=1)).replace(day=1)
+            
+            nav_info = {
+                'current': cal_date,
+                'next': next_month.strftime("01-%b-%Y").upper(),
+                'prev': prev_month.strftime("01-%b-%Y").upper()
+            }
+
+            html = render_template('calendar_content.html', calendar=parsed_data, nav=nav_info)
+            return jsonify({'status': 'success', 'html_content': html})
+
+        elif target == GRADES_TARGET:
             payload = {'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}
-            data_res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
-            data_res.raise_for_status()
+            res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
+            html = render_template('grades_content.html', data_html=res.text)
+            return jsonify({'status': 'success', 'html_content': html})
             
-            template_name = 'placeholder_content.html'
-            title = target.split('/')[-1].replace('_', ' ').title()
-            
-            if target == CALENDAR_TARGET:
-                 template_name = 'calendar_content.html'
-                 title = "Academic Calendar"
-            
-            rendered_html = render_template(template_name, title=title, data_html=data_res.text)
-            return jsonify({'status': 'success', 'html_content': rendered_html})
+        else:
+            # Generic Fallback
+            payload = {'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}
+            res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
+            html = render_template('placeholder_content.html', title=target, data_html=res.text)
+            return jsonify({'status': 'success', 'html_content': html})
 
     except Exception as e:
-        print(f"   > CRITICAL ERROR in '/fetch-data': {e}")
-        import traceback
-        traceback.print_exc()
-        if 'session_id' in locals() and session_id in session_storage:
-            del session_storage[session_id]
-        return jsonify({'status': 'session_expired', 'message': str(e)}), 401
-
+        print(f"Error in fetch-data: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 401
 
 @data_bp.route('/fetch-attendance-detail', methods=['POST'])
 def fetch_attendance_detail():
-    """
-    Fetches the detailed attendance for a specific class.
-    """
     data = request.json
     session_id = data.get('session_id')
     class_id = data.get('class_id')
     slot = data.get('slot')
-    semester_sub_id = data.get('semesterSubId') # Semester is now sent from client
+    semester_sub_id = data.get('semesterSubId')
     
     try:
         session, username, csrf_token, base_url = get_session_details(session_id)
-        headers = {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': f"{base_url}/content"
-            }
+        headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
         
-        if not semester_sub_id:
-             return jsonify({'status': 'failure', 'message': 'Semester ID not provided.'}), 400
-
-        print(f"\n--- Fetching attendance detail for {class_id} (Sem: {semester_sub_id}) ---")
-        
-        # *** THIS IS THE FIX ***
-        # The key VTOP expects is 'slotName', not 'slot'
         payload = {
             'authorizedID': username,
             '_csrf': csrf_token,
             'lSemesterSubId': semester_sub_id, 
             'classId': class_id,
-            'slotName': slot  # <-- Changed from 'slot' to 'slotName'
+            'slotName': slot 
         }
         
-        data_res = session.post(f"{base_url}/{ATTENDANCE_DETAIL_TARGET}", data=payload, headers=headers, verify=False)
-        data_res.raise_for_status()
-
-        # Parse the detailed HTML response
-        parsed_data = parse_attendance_detail(data_res.text)
-        rendered_html = render_template('attendance_detail_content.html', details=parsed_data)
-        
-        return jsonify({'status': 'success', 'html_content': rendered_html})
+        res = session.post(f"{base_url}/{ATTENDANCE_DETAIL_TARGET}", data=payload, headers=headers, verify=False)
+        parsed_data = parse_attendance_detail(res.text)
+        html = render_template('attendance_detail_content.html', details=parsed_data)
+        return jsonify({'status': 'success', 'html_content': html})
 
     except Exception as e:
-        print(f"   > CRITICAL ERROR in '/fetch-attendance-detail': {e}")
-        import traceback
-        traceback.print_exc()
-        if 'session_id' in locals() and session_id in session_storage:
-            del session_storage[session_id]
-        return jsonify({'status': 'session_expired', 'message': str(e)}), 401
-
+        return jsonify({'status': 'error', 'message': str(e)}), 401
 
 @data_bp.route('/get-od-snapshot', methods=['POST'])
 def get_od_snapshot():
-    """
-    Fetches attendance summary, then loops through each course to
-    fetch its details and sum up all "On Duty" entries.
-    Lab OD counts as 2.
-    """
     data = request.json
     session_id = data.get('session_id')
     semester_sub_id = data.get('semesterSubId')
     
     try:
         session, username, csrf_token, base_url = get_session_details(session_id)
-        headers = {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': f"{base_url}/content"
-        }
+        headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
 
-        # 1. Get the list of courses from the attendance summary page
-        print(f"\n--- Fetching OD Snapshot for {username} (Sem: {semester_sub_id}) ---")
         summary_payload = {'authorizedID': username, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
         summary_res = session.post(f"{base_url}/{ATTENDANCE_TARGET}", data=summary_payload, headers=headers, verify=False)
-        summary_res.raise_for_status()
-        
         course_list = parse_attendance_summary(summary_res.text)
         
-        if not course_list:
-            print("   > No courses found in attendance summary.")
-            return jsonify({'status': 'success', 'total_od_count': 0})
-
         total_od = 0
-        
-        # 2. Loop through each course and fetch its details
+        # Loop through courses to sum ODs (Optimized slightly to continue on error)
         for course in course_list:
-            if not course.get('class_id') or not course.get('slot_param'):
-                continue
-                
-            # *** MODIFICATION: Check if the course is a lab ***
-            is_lab = 'LAB' in course.get('course_type', '').upper()
+            if not course.get('class_id') or not course.get('slot_param'): continue
             
-            # Need to get a fresh CSRF token for each loop
-            session, username, csrf_token, base_url = get_session_details(session_id)
+            is_lab = 'LAB' in course.get('course_type', '').upper()
+            # Re-fetch CSRF just in case, though we are in a loop. 
+            # For performance, we reuse the session/token from above in this scope
             
             detail_payload = {
-                'authorizedID': username,
-                '_csrf': csrf_token,
-                'lSemesterSubId': semester_sub_id, 
-                'classId': course['class_id'],
-                'slotName': course['slot_param']
+                'authorizedID': username, '_csrf': csrf_token,
+                'lSemesterSubId': semester_sub_id, 'classId': course['class_id'], 'slotName': course['slot_param']
             }
-            
             try:
-                print(f"   > Fetching details for {course['course_code']} (Is Lab: {is_lab})...")
                 detail_res = session.post(f"{base_url}/{ATTENDANCE_DETAIL_TARGET}", data=detail_payload, headers=headers, verify=False)
-                detail_res.raise_for_status()
-                
                 detail_data = parse_attendance_detail(detail_res.text)
+                for d in detail_data:
+                    if d.get('status') == 'On Duty':
+                        total_od += 2 if is_lab else 1
+            except:
+                continue 
                 
-                for detail in detail_data:
-                    # *** MODIFICATION: Apply new OD counting logic ***
-                    if detail.get('status') == 'On Duty':
-                        if is_lab:
-                            total_od += 2
-                        else:
-                            total_od += 1
-                        
-            except Exception as e:
-                print(f"   > WARN: Could not fetch detail for {course['course_code']}. {e}")
-                # Continue to the next course even if one fails
-                continue
-        
-        print(f"   > Total OD count found (with lab logic): {total_od}")
         return jsonify({'status': 'success', 'total_od_count': total_od})
-
     except Exception as e:
-        print(f"   > CRITICAL ERROR in '/get-od-snapshot': {e}")
-        import traceback
-        traceback.print_exc()
-        if 'session_id' in locals() and session_id in session_storage:
-            del session_storage[session_id]
-        return jsonify({'status': 'session_expired', 'message': str(e)}), 401
+        return jsonify({'status': 'error', 'message': str(e)}), 401
