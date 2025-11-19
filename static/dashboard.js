@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- API Targets ---
     const TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn';
-    const GRADES_TARGET = 'examinations/examGradeView/StudentGradeView';
     const MARKS_TARGET = 'examinations/doStudentMarkView';
+    const EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent';
     const ATTENDANCE_TARGET = 'processViewStudentAttendance';
     const CALENDAR_TARGET = 'academics/common/CalendarPreview';
     const CURRICULUM_TARGET = 'student/viewMyCurriculum'; 
@@ -20,10 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const menuToggle = document.getElementById('menu-toggle');
     const sidebar = document.getElementById('sidebar');
     const navLinks = document.querySelectorAll('.nav-link');
+    const navLinkChildren = document.querySelectorAll('.nav-link-child'); // Combined selector
     const pageSections = document.querySelectorAll('.page-section');
-    const academicsNavLinks = document.querySelectorAll('.academics-nav-link');
-    const academicsSubsections = document.querySelectorAll('.academics-subsection');
     const academicsToggle = document.querySelector('[data-section="academics"]');
+    const examinationsToggle = document.querySelector('[data-section="examinations"]');
+    
     const semesterSelect = document.getElementById('semester-select');
     const logoutBtn = document.getElementById('logoutBtn');
     const sidebarUsername = document.getElementById('sidebar-username');
@@ -36,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const coursesContainer = document.getElementById('courses-container');
     const attendanceContainer = document.getElementById('attendance-container');
     const marksContainer = document.getElementById('marks-container');
-    const gradesContainer = document.getElementById('grades-container');
+    const examScheduleContainer = document.getElementById('exam-schedule-container');
     const curriculumContainer = document.getElementById('curriculum-container');
     const projectsContainer = document.getElementById('projects-container');
     const calendarContainer = document.getElementById('calendar-container');
@@ -52,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const allDataContainers = [
         todayScheduleContainer, timetableContainer, coursesContainer,
-        attendanceContainer, marksContainer, gradesContainer, curriculumContainer,
+        attendanceContainer, marksContainer, examScheduleContainer, curriculumContainer,
         projectsContainer, calendarContainer, enrollmentContainer,
         hostelContainer, profileContainer
     ];
@@ -70,27 +71,42 @@ document.addEventListener('DOMContentLoaded', () => {
         pageSections.forEach(section => {
             section.style.display = section.id === sectionId ? 'block' : 'none';
         });
+        // Toggle active state for main nav links
         navLinks.forEach(l => l.classList.toggle('active', l.dataset.section === sectionId));
-        if (academicsToggle && academicsToggle.parentElement) {
-             academicsToggle.classList.toggle('active', sectionId === 'academics');
-        }
+        
+        // Keep dropdown parents active if a child is active
+        if (sectionId === 'academics' && academicsToggle) academicsToggle.classList.add('active');
+        if (sectionId === 'examinations' && examinationsToggle) examinationsToggle.classList.add('active');
     }
 
-    function showAcademicsSubsection(subsectionId) {
-        academicsSubsections.forEach(subsection => {
-            subsection.style.display = subsection.id === subsectionId ? 'block' : 'none';
-        });
-        academicsNavLinks.forEach(l => {
+    function showSubsection(parentId, subsectionId) {
+        // Find the parent section (e.g., #academics)
+        const parentSection = document.getElementById(parentId);
+        if (!parentSection) return;
+
+        // Hide all subsections inside this parent
+        const subsections = parentSection.querySelectorAll(`.${parentId}-subsection`);
+        subsections.forEach(sub => sub.style.display = 'none');
+        
+        // Show the target subsection
+        const targetSub = document.getElementById(subsectionId);
+        if (targetSub) targetSub.style.display = 'block';
+
+        // Update nav link states
+        navLinkChildren.forEach(l => {
             l.classList.toggle('active-subsection', l.dataset.subsection === subsectionId);
         });
     }
 
     function getActivePage() {
         const activeNav = document.querySelector('.nav-link.active');
-        const activeSubNav = document.querySelector('.academics-nav-link.active-subsection');
-        if (activeNav && activeNav.dataset.section !== 'academics') {
+        const activeSubNav = document.querySelector('.nav-link-child.active-subsection');
+        
+        // If it's a direct main link (not a dropdown parent)
+        if (activeNav && !['academics', 'examinations'].includes(activeNav.dataset.section)) {
             return { type: 'section', id: activeNav.dataset.section };
         }
+        // If a subsection is active
         if (activeSubNav) {
             return { type: 'subsection', id: activeSubNav.dataset.subsection };
         }
@@ -140,15 +156,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (activePage.type === 'subsection') {
             switch (activePage.id) {
+                // Academics
                 case 'academics-courses':
                 case 'academics-timetable':
                     fetchTimetableAndCourses();
-                    break;
-                case 'academics-marks':
-                    fetchAndDisplay(MARKS_TARGET, marksContainer, "Marks");
-                    break;
-                case 'academics-grades':
-                    fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
                     break;
                 case 'academics-attendance':
                     fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
@@ -162,13 +173,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'academics-projects':
                     fetchAndDisplay(PROJECTS_TARGET, projectsContainer, "Projects");
                     break;
+                
+                // Examinations
+                case 'examinations-marks':
+                    fetchAndDisplay(MARKS_TARGET, marksContainer, "Marks");
+                    break;
+                case 'examinations-schedule':
+                    fetchAndDisplay(EXAM_SCHEDULE_TARGET, examScheduleContainer, "Exam Schedule");
+                    break;
             }
         }
     }
 
     // Main Nav Listeners
     navLinks.forEach(link => {
-        if (link === academicsToggle) return;
+        if (link === academicsToggle || link === examinationsToggle) return; // Skip dropdown toggles
+        
         link.addEventListener('click', (e) => {
             e.preventDefault();
             showPageSection(link.dataset.section);
@@ -184,20 +204,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Academics Sub-Nav Listeners
-    academicsNavLinks.forEach(link => {
+    // Subsection Nav Listeners (Handles both Academics and Examinations)
+    navLinkChildren.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            showPageSection('academics'); 
-            showAcademicsSubsection(link.dataset.subsection);
-            const sub = link.dataset.subsection;
+            const parentId = link.dataset.parent;
+            const subsectionId = link.dataset.subsection;
             
-            if (sub === 'academics-marks') fetchAndDisplay(MARKS_TARGET, marksContainer, "Marks");
-            else if (sub === 'academics-grades') fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
-            else if (sub === 'academics-attendance') fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
-            else if (sub === 'academics-calendar') fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar");
-            else if (sub === 'academics-curriculum') fetchAndDisplay(CURRICULUM_TARGET, curriculumContainer, "My Curriculum");
-            else if (sub === 'academics-projects') fetchAndDisplay(PROJECTS_TARGET, projectsContainer, "Projects");
+            showPageSection(parentId);
+            showSubsection(parentId, subsectionId);
+            
+            if (subsectionId === 'academics-attendance') fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
+            else if (subsectionId === 'academics-calendar') fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar");
+            else if (subsectionId === 'academics-curriculum') fetchAndDisplay(CURRICULUM_TARGET, curriculumContainer, "My Curriculum");
+            else if (subsectionId === 'academics-projects') fetchAndDisplay(PROJECTS_TARGET, projectsContainer, "Projects");
+            else if (subsectionId === 'examinations-marks') fetchAndDisplay(MARKS_TARGET, marksContainer, "Marks");
+            else if (subsectionId === 'examinations-schedule') fetchAndDisplay(EXAM_SCHEDULE_TARGET, examScheduleContainer, "Exam Schedule");
 
             if (window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
             contentContainer.scrollTop = 0;
@@ -419,7 +441,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const time_slot_keys = [
             "08:00 - 08:50", "08:55 - 09:45", "09:50 - 10:40", "10:45 - 11:35",
             "11:40 - 12:30", "12:35 - 13:25", "LUNCH", "14:00 - 14:50",
-            "14:55 - 15:45", "15:50 - 16:40", "16:45 - 17:35", "17:40 - 18:30", "18:35 - 19:25"
+            "14:55 - 15:45", "15:50 - 16:40", "16:45 - 17:35", "17:40 - 18:30",
+            "18:35 - 19:25"
         ];
         const dayMap = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
         const today = new Date();

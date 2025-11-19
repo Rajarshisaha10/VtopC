@@ -33,7 +33,6 @@
         .sidebar-hidden {
             transform: translateX(-100%);
         }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -41,13 +40,12 @@
         .dark ::-webkit-scrollbar-thumb { background: #4b5563; }
         .dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
         
-        /* Dark Mode Overrides for Raw HTML Content */
         .dark table { color: #e5e7eb !important; border-color: #374151 !important; }
         .dark table td, .dark table th { border-color: #374151 !important; background-color: transparent !important; }
         .dark table tr:nth-child(even) { background-color: rgba(55, 65, 81, 0.3) !important; }
         
-        .academics-nav-link.active-subsection { font-weight: 600; color: #4f46e5; background-color: #eef2ff; }
-        .dark .academics-nav-link.active-subsection { color: #818cf8; background-color: #374151; }
+        .nav-link-child.active-subsection { font-weight: 600; color: #4f46e5; background-color: #eef2ff; }
+        .dark .nav-link-child.active-subsection { color: #818cf8; background-color: #374151; }
         
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
@@ -77,15 +75,24 @@
                     <div class="flex items-center"><i data-lucide="graduation-cap" class="mr-3 h-5 w-5"></i> Academics</div>
                     <i data-lucide="chevron-down" class="h-4 w-4 transition-transform duration-200" :class="{'rotate-180': open}"></i>
                 </button>
-                <div x-show="open" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 transform -translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0" class="pl-11 space-y-1">
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-courses">My Courses</a>
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-timetable">Time Table</a>
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-attendance">Attendance</a>
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-marks">Marks</a>
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-grades">Grades (History)</a>
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-curriculum">Curriculum</a>
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-projects">Projects</a>
-                    <a href="#" class="academics-nav-link block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-subsection="academics-calendar">Calendar</a>
+                <div x-show="open" class="pl-11 space-y-1">
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="academics" data-subsection="academics-courses">My Courses</a>
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="academics" data-subsection="academics-timetable">Time Table</a>
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="academics" data-subsection="academics-attendance">Attendance</a>
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="academics" data-subsection="academics-calendar">Calendar</a>
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="academics" data-subsection="academics-curriculum">Curriculum</a>
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="academics" data-subsection="academics-projects">Projects</a>
+                </div>
+            </div>
+
+            <div x-data="{ open: false }" class="space-y-1">
+                <button @click="open = !open" class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-section="examinations">
+                    <div class="flex items-center"><i data-lucide="file-text" class="mr-3 h-5 w-5"></i> Examinations</div>
+                    <i data-lucide="chevron-down" class="h-4 w-4 transition-transform duration-200" :class="{'rotate-180': open}"></i>
+                </button>
+                <div x-show="open" class="pl-11 space-y-1">
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="examinations" data-subsection="examinations-marks">Marks</a>
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="examinations" data-subsection="examinations-schedule">Exam Schedule</a>
                 </div>
             </div>
             
@@ -182,11 +189,14 @@
                 <div id="academics-courses" class="academics-subsection"><div id="courses-container"></div></div>
                 <div id="academics-timetable" class="hidden academics-subsection"><div id="timetable-container"></div></div>
                 <div id="academics-attendance" class="hidden academics-subsection"><div id="attendance-container"></div></div>
-                <div id="academics-marks" class="hidden academics-subsection"><div id="marks-container"></div></div>
-                <div id="academics-grades" class="hidden academics-subsection"><div id="grades-container"></div></div>
+                <div id="academics-calendar" class="hidden academics-subsection"><div id="calendar-container"></div></div>
                 <div id="academics-curriculum" class="hidden academics-subsection"><div id="curriculum-container"></div></div>
                 <div id="academics-projects" class="hidden academics-subsection"><div id="projects-container"></div></div>
-                <div id="academics-calendar" class="hidden academics-subsection"><div id="calendar-container"></div></div>
+            </div>
+
+            <div id="examinations" class="hidden page-section">
+                <div id="examinations-marks" class="examinations-subsection"><div id="marks-container"></div></div>
+                <div id="examinations-schedule" class="hidden examinations-subsection"><div id="exam-schedule-container"></div></div>
             </div>
 
             <div id="enrollment" class="hidden page-section"><div id="enrollment-container"></div></div>

@@ -10,6 +10,7 @@ from parsers.timetable_parser import parse_course_data
 from parsers.attendance_parser import parse_attendance_summary, parse_attendance_detail
 from parsers.calendar_parser import parse_academic_calendar
 from parsers.marks_parser import parse_marks
+from parsers.exam_schedule_parser import parse_exam_schedule
 
 warnings.filterwarnings('ignore', category=requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
@@ -22,7 +23,7 @@ ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
 CALENDAR_TARGET = 'academics/common/CalendarPreview'
 CALENDAR_VIEW_TARGET = 'processViewCalendar'
 MARKS_TARGET = 'examinations/doStudentMarkView'
-GRADES_TARGET = 'examinations/examGradeView/StudentGradeView' # For generic view, if needed
+EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent' # New Target
 
 def get_session_details(session_id):
     if not session_id or 'session' not in session_storage.get(session_id, {}):
@@ -116,6 +117,14 @@ def fetch_data():
             res = session.post(f"{base_url}/{MARKS_TARGET}", data=payload, headers=headers, verify=False)
             parsed_data = parse_marks(res.text)
             html = render_template('marks_content.html', courses=parsed_data)
+            return jsonify({'status': 'success', 'html_content': html})
+            
+        elif target == EXAM_SCHEDULE_TARGET:
+            print(f"Fetching Exam Schedule for {username} (Sem: {semester_sub_id})")
+            payload = {'authorizedID': username, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
+            res = session.post(f"{base_url}/{EXAM_SCHEDULE_TARGET}", data=payload, headers=headers, verify=False)
+            parsed_data = parse_exam_schedule(res.text)
+            html = render_template('exam_schedule_content.html', exams=parsed_data)
             return jsonify({'status': 'success', 'html_content': html})
         
         else:
