@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- API Targets ---
     const TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn';
     const GRADES_TARGET = 'examinations/examGradeView/StudentGradeView';
+    const MARKS_TARGET = 'examinations/doStudentMarkView';
     const ATTENDANCE_TARGET = 'processViewStudentAttendance';
     const CALENDAR_TARGET = 'academics/common/CalendarPreview';
     const CURRICULUM_TARGET = 'student/viewMyCurriculum'; 
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const timetableContainer = document.getElementById('timetable-container');
     const coursesContainer = document.getElementById('courses-container');
     const attendanceContainer = document.getElementById('attendance-container');
+    const marksContainer = document.getElementById('marks-container');
     const gradesContainer = document.getElementById('grades-container');
     const curriculumContainer = document.getElementById('curriculum-container');
     const projectsContainer = document.getElementById('projects-container');
@@ -50,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const allDataContainers = [
         todayScheduleContainer, timetableContainer, coursesContainer,
-        attendanceContainer, gradesContainer, curriculumContainer,
+        attendanceContainer, marksContainer, gradesContainer, curriculumContainer,
         projectsContainer, calendarContainer, enrollmentContainer,
         hostelContainer, profileContainer
     ];
@@ -103,10 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (snapshotAttBar) snapshotAttBar.style.width = '0%';
         if (snapshotOdCount) snapshotOdCount.textContent = '... / 40';
         if (snapshotOdBar) snapshotOdBar.style.width = '0%';
-        if (todayScheduleContainer) todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">Loading today\'s schedule...</p>';
+        if (todayScheduleContainer) todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Loading today\'s schedule...</p>';
     }
 
-    // --- CALENDAR NAVIGATION ---
+    // Calendar Navigation Listener
     calendarContainer.addEventListener('click', (e) => {
         const navBtn = e.target.closest('.calendar-nav-btn');
         if (navBtn) {
@@ -142,6 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'academics-timetable':
                     fetchTimetableAndCourses();
                     break;
+                case 'academics-marks':
+                    fetchAndDisplay(MARKS_TARGET, marksContainer, "Marks");
+                    break;
                 case 'academics-grades':
                     fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
                     break;
@@ -161,28 +166,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Event Listeners
+    // Main Nav Listeners
     navLinks.forEach(link => {
         if (link === academicsToggle) return;
         link.addEventListener('click', (e) => {
             e.preventDefault();
             showPageSection(link.dataset.section);
-            if (link.dataset.section === 'enrollment') fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
-            else if (link.dataset.section === 'hostel') fetchAndDisplay(HOSTEL_TARGET, hostelContainer, "Hostel");
-            else if (link.dataset.section === 'profile') fetchAndDisplay(PROFILE_TARGET, profileContainer, "Profile");
+            const section = link.dataset.section;
             
+            if (section === 'enrollment') fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
+            else if (section === 'hostel') fetchAndDisplay(HOSTEL_TARGET, hostelContainer, "Hostel");
+            else if (section === 'profile') fetchAndDisplay(PROFILE_TARGET, profileContainer, "Profile");
+            else if (section === 'dashboard') refreshCurrentPage();
+
             if (window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
             contentContainer.scrollTop = 0;
         });
     });
 
+    // Academics Sub-Nav Listeners
     academicsNavLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             showPageSection('academics'); 
             showAcademicsSubsection(link.dataset.subsection);
             const sub = link.dataset.subsection;
-            if (sub === 'academics-grades') fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
+            
+            if (sub === 'academics-marks') fetchAndDisplay(MARKS_TARGET, marksContainer, "Marks");
+            else if (sub === 'academics-grades') fetchAndDisplay(GRADES_TARGET, gradesContainer, "Grades");
             else if (sub === 'academics-attendance') fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
             else if (sub === 'academics-calendar') fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar");
             else if (sub === 'academics-curriculum') fetchAndDisplay(CURRICULUM_TARGET, curriculumContainer, "My Curriculum");
@@ -206,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleFetchError(error, container) {
         console.error('Fetch error:', error);
-        // Only redirect on explicit session error
         if (error.message.includes("Session expired")) {
              localStorage.removeItem('vtop_session_id');
              window.location.href = '/login';
@@ -303,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 currentSemesterId = data.semesters[0].id;
                 
+                // Only load dashboard default items (not all tabs)
                 fetchTimetableAndCourses();
                 fetchAndCalculateAttendanceSnapshot();
                 fetchAndDisplayODSnapshot();

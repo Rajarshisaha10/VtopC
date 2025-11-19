@@ -1,90 +1,165 @@
-<section>
-    <div class="flex flex-col md:flex-row justify-between items-center mb-6">
-        <h2 class="text-3xl font-bold text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
-            {{ calendar.month_title if calendar else 'Academic Calendar' }}
-        </h2>
-        
-        {% if nav %}
-        <div class="flex space-x-3 mt-4 md:mt-0">
-            <button class="calendar-nav-btn px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center"
-                    data-date="{{ nav.prev }}">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                Prev
-            </button>
-            <button class="calendar-nav-btn px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center"
-                    data-date="{{ nav.next }}">
-                Next
-                <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </button>
-        </div>
-        {% endif %}
-    </div>
+<section id="registered-courses-content" class="mb-12">
+    <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
+        Registered Courses
+    </h2>
+    <div id="course-list" class="space-y-4 mt-6">
+        {% set consolidated_courses = {} %}
+        {% for course in data.courses %}
+            {% if course.course_code not in consolidated_courses %}
+                {% set _ = consolidated_courses.update({
+                    course.course_code: {
+                        'title': course.course_title,
+                        'code': course.course_code,
+                        'faculty': course.faculty,
+                        'credits': 0.0,
+                        'parts': []
+                    }
+                }) %}
+            {% endif %}
+            {% set _ = consolidated_courses[course.course_code].parts.append({
+                'type': course.course_type,
+                'slot': course.slot,
+                'venue': course.venue
+            }) %}
+            {% set _ = consolidated_courses[course.course_code].update({
+                'credits': consolidated_courses[course.course_code].credits + (course.credits | float(0))
+            }) %}
+        {% endfor %}
 
-    {% if calendar and calendar.days %}
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="grid grid-cols-7 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-            {% for day in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] %}
-            <div class="py-3 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                {{ day }}
-            </div>
-            {% endfor %}
-        </div>
-
-        <div class="grid grid-cols-7 auto-rows-fr bg-gray-200 dark:bg-gray-600 gap-px border-b border-gray-200 dark:border-gray-600">
-            {% for day_obj in calendar.days %}
-                {# Define colors based on aggregated status #}
-                {% if day_obj.status == 'working' %}
-                    {# Green #}
-                    {% set cell_bg = "bg-green-100 dark:bg-green-900/40" %}
-                    {% set text_cls = "text-green-800 dark:text-green-200" %}
-                    {% set date_cls = "text-green-600 dark:text-green-300/70" %}
-                
-                {% elif day_obj.status == 'day_order' %}
-                    {# Yellow #}
-                    {% set cell_bg = "bg-yellow-100 dark:bg-yellow-900/40" %}
-                    {% set text_cls = "text-yellow-800 dark:text-yellow-200" %}
-                    {% set date_cls = "text-yellow-600 dark:text-yellow-300/70" %}
-
-                {% elif day_obj.status == 'holiday' %}
-                    {# Red #}
-                    {% set cell_bg = "bg-red-100 dark:bg-red-900/40" %}
-                    {% set text_cls = "text-red-800 dark:text-red-200" %}
-                    {% set date_cls = "text-red-600 dark:text-red-300/70" %}
-
-                {% else %}
-                    {# Default/Padding #}
-                    {% set cell_bg = "bg-white dark:bg-gray-800" %}
-                    {% set text_cls = "text-gray-600 dark:text-gray-400" %}
-                    {% set date_cls = "text-gray-400 dark:text-gray-600" %}
-                {% endif %}
-                
-                {% if not day_obj.day %}
-                    {# Empty padding cell #}
-                    <div class="bg-gray-50/50 dark:bg-gray-800/50 min-h-[100px]"></div>
-                {% else %}
-                    <div class="{{ cell_bg }} min-h-[100px] p-2 relative transition-colors flex flex-col justify-between hover:brightness-95 dark:hover:brightness-110">
-                        <span class="absolute top-2 left-2 text-sm font-bold {{ date_cls }}">
-                            {{ day_obj.day }}
-                        </span>
-                        
-                        <div class="mt-6 flex-1 flex flex-col items-center justify-center space-y-1">
-                            {% for event in day_obj.events %}
-                                <p class="text-[10px] font-bold text-center leading-tight {{ text_cls }}">
-                                    {{ event.text }}
-                                </p>
-                            {% endfor %}
-                        </div>
+        {% for course_code, course in consolidated_courses.items() %}
+        <details class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md overflow-hidden transition-all duration-200 group">
+            <summary class="p-4 cursor-pointer flex justify-between items-center font-semibold select-none">
+                <div class="flex items-center overflow-hidden">
+                    <span class="text-indigo-700 dark:text-indigo-300 font-mono bg-indigo-50 dark:bg-indigo-900/30 rounded-md px-2 py-1 text-xs mr-3 border border-indigo-100 dark:border-indigo-800/50 whitespace-nowrap">
+                        {{ course.code }}
+                    </span>
+                    <span class="text-gray-800 dark:text-gray-100 truncate mr-2">{{ course.title }}</span>
+                </div>
+                <div class="flex items-center space-x-3 flex-shrink-0">
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
+                        {{ "%.1f" | format(course.credits) }} Cr
+                    </span>
+                    <div class="bg-gray-100 dark:bg-gray-700 rounded-full p-1 text-gray-500 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        <svg class="w-4 h-4 transform transition-transform duration-200 arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
                     </div>
-                {% endif %}
-            {% endfor %}
+                </div>
+            </summary>
+            <div class="px-4 pb-4 pt-0 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/50">
+                <div class="mt-3">
+                     <p class="text-sm text-gray-600 dark:text-gray-300 mb-3 flex items-start">
+                        <i data-lucide="user" class="w-4 h-4 mr-2 mt-0.5 text-gray-400"></i>
+                        <span class="font-medium">{{ course.faculty }}</span>
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {% for part in course.parts %}
+                        <div class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 p-3 rounded-lg shadow-sm">
+                            <div class="flex justify-between items-center mb-1">
+                                <p class="font-bold text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">
+                                    {{ part.type.replace('(', '').replace(')', '').strip() or 'Course' }}
+                                </p>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500 dark:text-gray-400 text-xs">Slot: <strong class="text-gray-700 dark:text-gray-200">{{ part.slot or 'N/A' }}</strong></span>
+                                <span class="text-gray-500 dark:text-gray-400 text-xs">Venue: <strong class="text-gray-700 dark:text-gray-200">{{ part.venue or 'N/A' }}</strong></span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+</section>
+
+<section id="weekly-timetable-content">
+    <h2 class="text-3xl font-bold mb-8 text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
+        Weekly Timetable
+    </h2>
+
+    <div class="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto">
+            {% set time_slot_keys = ["08:00 - 08:50", "08:55 - 09:45", "09:50 - 10:40", "10:45 - 11:35", "11:40 - 12:30", "12:35 - 13:25", "LUNCH", "14:00 - 14:50", "14:55 - 15:45", "15:50 - 16:40", "16:45 - 17:35", "17:40 - 18:30", "18:35 - 19:25"] %}
+            {% set days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] %}
+            {% set day_cols = {'MON': 2, 'TUE': 3, 'WED': 4, 'THU': 5, 'FRI': 6, 'SAT': 7, 'SUN': 8} %}
+            
+            <div class="grid timetable-grid min-w-[800px]" style="grid-template-columns: auto repeat(7, minmax(100px, 1fr)); grid-template-rows: auto repeat(13, minmax(60px, auto));">
+                
+                <div class="sticky top-0 left-0 z-20 bg-gray-50 dark:bg-gray-800 border-b border-r border-gray-200 dark:border-gray-700" style="grid-row: 1; grid-column: 1;"></div>
+                
+                {% for day in days %}
+                <div class="sticky top-0 z-10 p-2 text-xs font-bold text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-b border-r border-gray-200 dark:border-gray-700" style="grid-row: 1; grid-column: {{ loop.index + 1 }};">
+                    {{ day }}
+                </div>
+                {% endfor %}
+
+                {% for slot in time_slot_keys %}
+                    {% set row = loop.index + 1 %} 
+                    <div class="sticky left-0 z-10 p-2 text-right text-[10px] font-mono text-gray-500 dark:text-gray-400 border-b border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-end" style="grid-row: {{ row }}; grid-column: 1;">
+                        {{ slot.split(' - ')[0] }}
+                    </div>
+                    
+                    {% for day in days %}
+                        {% set col = loop.index + 1 %} 
+                        <div class="border-b border-r border-gray-100 dark:border-gray-700/50 bg-white dark:bg-gray-900" style="grid-row: {{ row }}; grid-column: {{ col }};">
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+                
+                <div class="col-start-2 col-span-7 row-start-8 flex items-center justify-center text-xs font-bold tracking-widest text-red-500/50 bg-red-50/50 dark:bg-red-900/10 dark:text-red-400/50 border-b border-r border-gray-200 dark:border-gray-700 pointer-events-none">
+                    L U N C H
+                </div>
+
+                {# Predefined colors with dark mode support #}
+                {% set colors = [
+                    'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800',
+                    'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-800',
+                    'bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-900/40 dark:text-violet-200 dark:border-violet-800',
+                    'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800',
+                    'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-200 dark:border-cyan-800',
+                    'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/40 dark:text-rose-200 dark:border-rose-800',
+                    'bg-lime-100 text-lime-800 border-lime-200 dark:bg-lime-900/40 dark:text-lime-200 dark:border-lime-800',
+                    'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200 dark:bg-fuchsia-900/40 dark:text-fuchsia-200 dark:border-fuchsia-800',
+                    'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-800'
+                ] %}
+
+                {% set color_index = 0 %}
+                {% set course_colors = {} %}
+
+                {% for day in days %}
+                    {% for slot in time_slot_keys %}
+                        {% set row_index0 = loop.index0 %} 
+                        {% set col_index = day_cols[day] %} 
+                        
+                        {% if slot != 'LUNCH' and data.timetable[day].get(slot) and data.timetable[day][slot].rowspan %}
+                            {% set course = data.timetable[day][slot] %}
+                            {% set code = course.code %}
+                            {% set rowspan = course.rowspan %} 
+                            
+                            {% if code not in course_colors %}
+                                {% set color_class = colors[color_index % colors|length] %}
+                                {% set _ = course_colors.update({code: color_class}) %}
+                                {% set color_index = color_index + 1 %}
+                            {% endif %}
+                            
+                            <div class="timetable-course-card m-0.5 p-1.5 rounded-md border shadow-sm flex flex-col justify-center cursor-default hover:brightness-95 dark:hover:brightness-110 transition-all {{ course_colors[code] }}" 
+                                 style="grid-column: {{ col_index }}; grid-row: {{ row_index0 + 2 }} / span {{ rowspan }}; z-index: 5;">
+                                <p class="font-bold text-[10px] leading-tight">{{ course.code }}</p>
+                                <p class="text-[9px] font-medium leading-tight line-clamp-2 opacity-90 my-0.5">{{ course.title }}</p>
+                                <p class="text-[8px] opacity-75 flex items-center gap-0.5">
+                                    <i data-lucide="map-pin" class="w-2 h-2"></i> {{ course.venue }}
+                                </p>
+                            </div>
+
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+                </div>
+        </div>
+        <div class="mt-4 px-4 pb-2 text-right text-sm font-semibold text-gray-600 dark:text-gray-400">
+            Total Credits: <span class="text-indigo-600 dark:text-indigo-400 text-lg">{{ data.total_credits }}</span>
         </div>
     </div>
-    {% else %}
-    <div class="p-12 text-center">
-        <div class="inline-block p-4 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 mb-3">
-            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-        </div>
-        <p class="text-gray-500 dark:text-gray-400 text-lg">Calendar data not available for this month.</p>
-    </div>
-    {% endif %}
 </section>
