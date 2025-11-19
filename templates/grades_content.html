@@ -1,8 +1,12 @@
 <section>
-    <h2 class="text-3xl font-bold mb-8 text-gray-800 border-b-4 border-indigo-500 inline-block pb-2">
+    <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
         Grades & Performance
     </h2>
-    <div class="card p-6 overflow-x-auto bg-white">
-        <pre class="whitespace-pre-wrap">{{ data_html | safe }}</pre>
+    <div class="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="overflow-x-auto p-4">
+            <div class="raw-html-content text-gray-700 dark:text-gray-300">
+                {{ data_html | safe }}
+            </div>
+        </div>
     </div>
 </section>
