@@ -2,59 +2,78 @@
     <h2 class="text-3xl font-bold mb-8 text-gray-800 border-b-4 border-indigo-500 inline-block pb-2">
         My Attendance
     </h2>
-    <div class="card p-6 overflow-x-auto bg-white">
-        <div class="table-responsive">
-            <table class="w-full text-sm text-left text-gray-600">
-                <thead class="text-xs text-gray-700 uppercase bg-gray-100">
-                    <tr>
-                        <th class="py-3 px-4">Sl.No</th>
-                        <th class="py-3 px-4">Course Code</th>
-                        <th class="py-3 px-4">Course Title</th>
-                        <th class="py-3 px-4">Type</th>
-                        <th class="py-3 px-4">Slot</th>
-                        <th class="py-3 px-4">Faculty</th>
-                        <th class="py-3 px-4 text-center">Attended</th>
-                        <th class="py-3 px-4 text-center">Total</th>
-                        <th class="py-3 px-4 text-center">Percent</th>
-                        <th class="py-3 px-4 text-center">Details</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% if courses %}
-                        {% for course in courses %}
-                        <tr class="bg-white hover:bg-gray-50">
-                            <td class="py-3 px-4">{{ course.sl_no }}</td>
-                            <td class="py-3 px-4 font-mono">{{ course.course_code }}</td>
-                            <td class="py-3 px-4">{{ course.course_title }}</td>
-                            <td class="py-3 px-4">{{ course.course_type }}</td>
-                            <td class="py-3 px-4">{{ course.slot }}</td>
-                            <td class-="py-3 px-4 text-xs">{{ course.faculty }}</td>
-                            <td class="py-3 px-4 text-center">{{ course.attended_classes }}</td>
-                            <td class="py-3 px-4 text-center">{{ course.total_classes }}</td>
-                            <td class="py-3 px-4 text-center font-bold 
-                                {% if course.percentage | int >= 75 %}text-green-600
-                                {% else %}text-red-600{% endif %}">
-                                {{ course.percentage }}%
-                            </td>
-                            <td class="py-3 px-4 text-center">
-                                {% if course.class_id %}
-                                <button class="view-attendance-detail text-indigo-600 hover:underline text-xs font-medium"
-                                        data-class-id="{{ course.class_id }}"
-                                        data-slot="{{ course.slot_param }}"
-                                        data-course-title="{{ course.course_title }}">
-                                    View
-                                </button>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
+    
+    {% if courses %}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {% for course in courses %}
+        <div class="card bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200 flex justify-between items-stretch relative overflow-hidden">
+            
+            {# --- Left Side: Info --- #}
+            <div class="flex flex-col justify-between flex-1 pr-4 z-10">
+                <div>
+                    <h3 class="font-bold text-gray-800 text-lg leading-tight mb-2 line-clamp-2" title="{{ course.course_title }}">
+                        {{ course.course_title }}
+                    </h3>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <span class="bg-indigo-50 text-indigo-700 px-2 py-1 text-xs rounded-md font-mono font-medium border border-indigo-100">
+                            {{ course.course_code }}
+                        </span>
+                        <span class="bg-gray-100 text-gray-600 px-2 py-1 text-xs rounded-md font-medium border border-gray-200">
+                            {{ course.slot }}
+                        </span>
+                        <span class="bg-gray-50 text-gray-500 px-2 py-1 text-xs rounded-md border border-gray-200">
+                            {{ course.course_type }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="mt-2">
+                    {% if course.class_id %}
+                    <button class="view-attendance-detail inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                            data-class-id="{{ course.class_id }}"
+                            data-slot="{{ course.slot_param }}"
+                            data-course-title="{{ course.course_title }}">
+                        View Details
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
                     {% else %}
-                        <tr class="bg-white">
-                            <td colspan="10" class="py-4 px-4 text-center text-gray-500">No attendance data found.</td>
-                        </tr>
+                    <span class="text-xs text-gray-400 italic">No details available</span>
                     {% endif %}
-                </tbody>
-            </table>
+                </div>
+            </div>
+
+            {# --- Right Side: Vertical Progress Bar --- #}
+            <div class="flex flex-col items-center justify-center pl-4 border-l border-dashed border-gray-200">
+                {# Determine Color based on percentage #}
+                {% set pct = course.percentage | float(0) %}
+                {% if pct >= 75 %}
+                    {% set color_cls = "bg-green-500" %}
+                    {% set text_cls = "text-green-600" %}
+                    {% set bg_cls = "bg-green-100" %}
+                {% else %}
+                    {% set color_cls = "bg-red-500" %}
+                    {% set text_cls = "text-red-600" %}
+                    {% set bg_cls = "bg-red-100" %}
+                {% endif %}
+
+                <div class="relative h-24 w-4 {{ bg_cls }} rounded-full overflow-hidden flex items-end" title="{{ course.percentage }}%">
+                    <div class="{{ color_cls }} w-full rounded-full transition-all duration-1000 ease-out" style="height: {{ course.percentage }}%;"></div>
+                </div>
+                
+                <div class="text-center mt-2">
+                    <span class="block font-bold text-sm {{ text_cls }}">{{ course.percentage }}%</span>
+                    <span class="block text-[10px] text-gray-400 font-medium mt-0.5">
+                        {{ course.attended_classes }} / {{ course.total_classes }}
+                    </span>
+                </div>
+            </div>
+
         </div>
+        {% endfor %}
     </div>
+    {% else %}
+    <div class="card p-10 bg-white text-center">
+        <p class="text-gray-500 text-lg">No attendance data found.</p>
+    </div>
+    {% endif %}
 </section>
