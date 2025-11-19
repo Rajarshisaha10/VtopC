@@ -33,7 +33,13 @@
         <div class="grid grid-cols-7 auto-rows-fr bg-gray-200 dark:bg-gray-600 gap-px border-b border-gray-200 dark:border-gray-600">
             {% for day_obj in calendar.days %}
                 {# Define colors based on aggregated status #}
-                {% if day_obj.status == 'working' %}
+                {% if day_obj.status == 'exam' %}
+                    {# Orange for Exams #}
+                    {% set cell_bg = "bg-orange-100 dark:bg-orange-900/40" %}
+                    {% set text_cls = "text-orange-800 dark:text-orange-200" %}
+                    {% set date_cls = "text-orange-600 dark:text-orange-300/70" %}
+
+                {% elif day_obj.status == 'working' %}
                     {# Green #}
                     {% set cell_bg = "bg-green-100 dark:bg-green-900/40" %}
                     {% set text_cls = "text-green-800 dark:text-green-200" %}

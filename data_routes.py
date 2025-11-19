@@ -23,7 +23,7 @@ ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
 CALENDAR_TARGET = 'academics/common/CalendarPreview'
 CALENDAR_VIEW_TARGET = 'processViewCalendar'
 MARKS_TARGET = 'examinations/doStudentMarkView'
-EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent' # New Target
+EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent'
 
 def get_session_details(session_id):
     if not session_id or 'session' not in session_storage.get(session_id, {}):
@@ -100,11 +100,54 @@ def fetch_data():
             if not cal_date:
                 now = datetime.datetime.now()
                 cal_date = now.strftime("01-%b-%Y").upper()
+            
+            # 1. Fetch and Parse Calendar
             payload = { 'authorizedID': username, '_csrf': csrf_token, 'calDate': cal_date, 'semSubId': semester_sub_id, 'classGroupId': 'ALL03', 'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT") }
             res = session.post(f"{base_url}/{CALENDAR_VIEW_TARGET}", data=payload, headers=headers, verify=False)
             parsed_data = parse_academic_calendar(res.text)
             
-            curr_dt = datetime.datetime.strptime(cal_date, "%d-%b-%Y")
+            # 2. Fetch and Merge Exam Schedule
+            try:
+                # Normalize date for parsing (Title case for %b e.g., NOV -> Nov)
+                cal_dt_obj = datetime.datetime.strptime(cal_date.title(), "%d-%b-%Y")
+                view_month = cal_dt_obj.month
+                view_year = cal_dt_obj.year
+
+                exam_payload = {'authorizedID': username, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
+                exam_res = session.post(f"{base_url}/{EXAM_SCHEDULE_TARGET}", data=exam_payload, headers=headers, verify=False)
+                exam_schedule = parse_exam_schedule(exam_res.text)
+
+                # Map exam dates to calendar days
+                for exam in exam_schedule:
+                    try:
+                        # exam_date format expected: "18-Nov-2024"
+                        ex_date = datetime.datetime.strptime(exam['exam_date'], "%d-%b-%Y")
+                        
+                        if ex_date.month == view_month and ex_date.year == view_year:
+                            for day_obj in parsed_data['days']:
+                                if day_obj['day'] == ex_date.day:
+                                    # Set status for coloring (Orange)
+                                    day_obj['status'] = 'exam' 
+                                    
+                                    # Filter out any existing "Holiday" or "No Instructional" events on this exam day
+                                    day_obj['events'] = [
+                                        e for e in day_obj['events'] 
+                                        if 'holiday' not in e['text'].lower() and 'no instructional' not in e['text'].lower()
+                                    ]
+
+                                    # Add formatted exam details: "TYPE: CODE (SLOT)"
+                                    exam_type_lbl = exam.get('exam_type', 'Exam')
+                                    day_obj['events'].append({
+                                        'text': f"{exam_type_lbl}: {exam['course_code']} ({exam['slot']})"
+                                    })
+                    except (ValueError, KeyError, TypeError):
+                        continue
+            except Exception as e:
+                print(f"Error merging exam schedule into calendar: {e}")
+                # Continue rendering calendar even if exam merge fails
+
+            # Navigation Logic
+            curr_dt = datetime.datetime.strptime(cal_date.title(), "%d-%b-%Y")
             next_month = (curr_dt + datetime.timedelta(days=32)).replace(day=1)
             prev_month = (curr_dt - datetime.timedelta(days=1)).replace(day=1)
             nav_info = { 'current': cal_date, 'next': next_month.strftime("01-%b-%Y").upper(), 'prev': prev_month.strftime("01-%b-%Y").upper() }
@@ -120,7 +163,6 @@ def fetch_data():
             return jsonify({'status': 'success', 'html_content': html})
             
         elif target == EXAM_SCHEDULE_TARGET:
-            print(f"Fetching Exam Schedule for {username} (Sem: {semester_sub_id})")
             payload = {'authorizedID': username, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
             res = session.post(f"{base_url}/{EXAM_SCHEDULE_TARGET}", data=payload, headers=headers, verify=False)
             parsed_data = parse_exam_schedule(res.text)
