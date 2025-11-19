@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request
 from bs4 import BeautifulSoup
 import uuid
 import os
-import warnings # Import warnings
+import warnings
 
 from session_manager import session_storage
 
@@ -24,8 +24,9 @@ def check_session():
     """
     session_id = request.json.get('session_id')
     if session_id and session_id in session_storage:
-        username = session_storage[session_id].get('username', 'User')
-        return jsonify({'status': 'success', 'message': f'Welcome back, {username}!', 'session_id': session_id})
+        # Return the authorized_id (Roll No) if available, otherwise username
+        user_display = session_storage[session_id].get('authorized_id', session_storage[session_id].get('username', 'User'))
+        return jsonify({'status': 'success', 'message': f'Welcome back, {user_display}!', 'session_id': session_id, 'username': user_display})
     return jsonify({'status': 'failure'})
 
 
@@ -44,7 +45,7 @@ def start_login():
         soup_land = BeautifulSoup(landing_page_response.text, 'html.parser')
         csrf_token_prelogin = soup_land.find('input', {'name': '_csrf'}).get('value')
         
-        print(f"   > Got pre-login CSRF: {csrf_token_prelogin[:10]}...") # DEBUG
+        print(f"   > Got pre-login CSRF: {csrf_token_prelogin[:10]}...") 
         
         prelogin_payload = {'_csrf': csrf_token_prelogin, 'flag': 'VTOP'}
         login_page_response = api_session.post(
@@ -58,7 +59,7 @@ def start_login():
         soup_login = BeautifulSoup(login_page_response.text, 'html.parser')
         csrf_token_login = soup_login.find('input', {'name': '_csrf'}).get('value')
         
-        print(f"   > Got login-page CSRF: {csrf_token_login[:10]}...") # DEBUG
+        print(f"   > Got login-page CSRF: {csrf_token_login[:10]}...") 
         
         captcha_url = VTOP_BASE_URL + "get/new/captcha"
         captcha_response = api_session.get(captcha_url, headers=HEADERS, verify=False, timeout=20)
@@ -86,7 +87,6 @@ def start_login():
 
     except Exception as e:
         print(f"   > CRITICAL ERROR during CAPTCHA fetch: {e}")
-        # Clear the bad session
         if session_id in session_storage:
             del session_storage[session_id]
         return jsonify({'status': 'failure', 'message': str(e)}), 500
@@ -105,12 +105,9 @@ def login_attempt():
     api_session = stored_session['session']
     csrf_token = stored_session['csrf_token']
     
-    # --- DEBUGGING CODE ---
     print(f"\n[DEBUG] 2. Attempting login for session: {session_id}")
     print(f"   > Username: {username}")
     print(f"   > CAPTCHA Sent: {captcha_text}")
-    print(f"   > CSRF Token Used: {csrf_token[:10]}...")
-    # --- END DEBUGGING ---
 
     try:
         payload = {"_csrf": csrf_token, "username": username, "password": password, "captchaStr": captcha_text}
@@ -123,31 +120,49 @@ def login_attempt():
         login_form = soup.find('form', {'id': 'vtopLoginForm'})
 
         if not login_form:
-            print("   > Login successful! (Login form not found on response page)")
+            print("   > Login successful! Parsing Roll No...")
+            
+            # --- EXTRACTION LOGIC STARTS HERE ---
+            # VTOP usually returns the roll number in a hidden input named 'authorizedID'
+            authorized_id = username # Default fallback
+            
+            auth_id_tag = soup.find('input', {'name': 'authorizedID'})
+            if auth_id_tag and auth_id_tag.get('value'):
+                 authorized_id = auth_id_tag.get('value')
+            else:
+                 # Try finding 'authorizedIDX' as seen in your res.txt
+                 auth_idx_tag = soup.find('input', {'id': 'authorizedIDX'})
+                 if auth_idx_tag and auth_idx_tag.get('value'):
+                     authorized_id = auth_idx_tag.get('value')
+            
+            print(f"   > Extracted Authorized ID (Roll No): {authorized_id}")
+            
             stored_session['username'] = username
-            return jsonify({'status': 'success', 'message': f'Welcome, {username}!', 'session_id': session_id})
+            stored_session['authorized_id'] = authorized_id # Store the extracted roll no
+            # --- EXTRACTION LOGIC ENDS HERE ---
+
+            return jsonify({'status': 'success', 'message': f'Welcome, {authorized_id}!', 'session_id': session_id})
         else:
             print("   > Login failed. Parsing for error...")
-            
-            error_message = "Invalid credentials or CAPTCHA." # Safe default
+            error_message = "Invalid credentials or CAPTCHA."
             status_code = 'invalid_credentials'
 
             error_tag = soup.select_one("span.text-danger strong")
             if error_tag:
                 specific_error_text = error_tag.get_text(strip=True).lower()
-                print(f"   > VTOP Error Message: '{specific_error_text}'") # DEBUG
+                print(f"   > VTOP Error Message: '{specific_error_text}'")
                 if 'captcha' in specific_error_text:
                     status_code = 'invalid_captcha'
                     error_message = 'The CAPTCHA you entered was incorrect.'
                 elif 'loginid' in specific_error_text or 'password' in specific_error_text:
                     status_code = 'invalid_credentials'
                     error_message = 'Invalid username or password.'
+                elif 'maximum fail attempts' in specific_error_text:
+                    status_code = 'locked'
+                    error_message = 'Maximum failed attempts reached. Please reset your password or try later.'
                 else:
                     error_message = error_tag.get_text(strip=True)
             
-            # --- THIS BLOCK IS SIMPLIFIED ---
-            # Just report the failure. The frontend will restart the process.
-            print(f"   > Reporting '{status_code}' to frontend.")
             return jsonify({
                 'status': status_code,
                 'message': error_message
