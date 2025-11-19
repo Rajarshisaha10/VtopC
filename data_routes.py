@@ -9,6 +9,7 @@ from session_manager import session_storage
 from parsers.timetable_parser import parse_course_data
 from parsers.attendance_parser import parse_attendance_summary, parse_attendance_detail
 from parsers.calendar_parser import parse_academic_calendar
+from parsers.marks_parser import parse_marks # Import the new parser
 
 warnings.filterwarnings('ignore', category=requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
@@ -17,9 +18,10 @@ data_bp = Blueprint('data_bp', __name__)
 # --- Targets ---
 TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
 GRADES_TARGET = 'examinations/examGradeView/StudentGradeView'
+GRADES_VIEW_TARGET = 'examinations/doStudentMarkView' # Endpoint for actual marks
 ATTENDANCE_TARGET = 'processViewStudentAttendance'
 CALENDAR_TARGET = 'academics/common/CalendarPreview'
-CALENDAR_VIEW_TARGET = 'processViewCalendar' # Endpoint for actual calendar data
+CALENDAR_VIEW_TARGET = 'processViewCalendar'
 ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
 
 
@@ -34,8 +36,7 @@ def get_session_details(session_id):
     
     base_url = "https://vtopcc.vit.ac.in/vtop"
     
-    # --- FIX: Fetch a fresh CSRF token from /content ---
-    # This is required for the Semester Dropdown and other requests to work.
+    # Refresh CSRF
     try:
         headers = {'Referer': f"{base_url}/content"}
         content_res = session.get(f"{base_url}/content", verify=False, headers=headers)
@@ -44,7 +45,6 @@ def get_session_details(session_id):
         
         csrf_token_tag = soup.find('input', {'name': '_csrf'})
         if not csrf_token_tag:
-            # Try to see if we are logged out
             if session_id in session_storage:
                 del session_storage[session_id]
             raise Exception("Session expired (CSRF missing).")
@@ -65,8 +65,6 @@ def get_semesters():
         session, username, csrf_token, base_url = get_session_details(session_id)
         headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
         
-        # Hit timetable page to get semester dropdown
-        print("Fetching semester list...")
         res = session.post(
             f"{base_url}/{TIMETABLE_TARGET}", 
             data={'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}, 
@@ -83,7 +81,6 @@ def get_semesters():
                 if opt.get('value'):
                     semesters.append({'id': opt['value'], 'name': opt.get_text(strip=True)})
         
-        print(f"Found {len(semesters)} semesters.")
         return jsonify({'status': 'success', 'semesters': semesters})
 
     except Exception as e:
@@ -97,8 +94,6 @@ def fetch_data():
     session_id = data.get('session_id')
     target = data.get('target')
     semester_sub_id = data.get('semesterSubId')
-    
-    # Optional params for calendar navigation
     cal_date = data.get('calDate') 
 
     try:
@@ -120,34 +115,24 @@ def fetch_data():
             return jsonify({'status': 'success', 'html_content': html, 'raw_data': parsed_data})
             
         elif target == CALENDAR_TARGET:
-            # Calendar Logic
-            # 1. Default to current month if no date provided
             if not cal_date:
                 now = datetime.datetime.now()
                 cal_date = now.strftime("01-%b-%Y").upper()
 
-            print(f"Fetching Calendar for: {cal_date} Sem: {semester_sub_id}")
-            
-            # Payload for processViewCalendar based on your res.txt
-            # We assume classGroupId='COMB' (All Class Group) is generally safe/available
             payload = {
                 'authorizedID': username, 
                 '_csrf': csrf_token, 
                 'calDate': cal_date,
                 'semSubId': semester_sub_id,
-                'classGroupId': 'ALL03', 
+                'classGroupId': 'COMB', 
                 'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT")
             }
             
             res = session.post(f"{base_url}/{CALENDAR_VIEW_TARGET}", data=payload, headers=headers, verify=False)
-            
             parsed_data = parse_academic_calendar(res.text)
             
-            # Calculate Navigation Dates
             curr_dt = datetime.datetime.strptime(cal_date, "%d-%b-%Y")
-            # Next month: Add 32 days then go to day 1
             next_month = (curr_dt + datetime.timedelta(days=32)).replace(day=1)
-            # Prev month: Subtract 1 day then go to day 1
             prev_month = (curr_dt - datetime.timedelta(days=1)).replace(day=1)
             
             nav_info = {
@@ -160,13 +145,21 @@ def fetch_data():
             return jsonify({'status': 'success', 'html_content': html})
 
         elif target == GRADES_TARGET:
-            payload = {'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}
-            res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
-            html = render_template('grades_content.html', data_html=res.text)
+            print(f"Fetching Marks for {username} (Sem: {semester_sub_id})")
+            # Use the specific view target for data
+            payload = {
+                'authorizedID': username, 
+                '_csrf': csrf_token, 
+                'semesterSubId': semester_sub_id
+            }
+            res = session.post(f"{base_url}/{GRADES_VIEW_TARGET}", data=payload, headers=headers, verify=False)
+            
+            parsed_data = parse_marks(res.text)
+            html = render_template('grades_content.html', courses=parsed_data)
             return jsonify({'status': 'success', 'html_content': html})
             
         else:
-            # Generic Fallback
+            # Fallback
             payload = {'authorizedID': username, '_csrf': csrf_token, 'verifyMenu': 'true'}
             res = session.post(f"{base_url}/{target}", data=payload, headers=headers, verify=False)
             html = render_template('placeholder_content.html', title=target, data_html=res.text)
@@ -176,6 +169,7 @@ def fetch_data():
         print(f"Error in fetch-data: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 401
 
+# ... [Fetch Attendance Detail and OD Snapshot routes remain unchanged] ...
 @data_bp.route('/fetch-attendance-detail', methods=['POST'])
 def fetch_attendance_detail():
     data = request.json
@@ -219,14 +213,10 @@ def get_od_snapshot():
         course_list = parse_attendance_summary(summary_res.text)
         
         total_od = 0
-        # Loop through courses to sum ODs (Optimized slightly to continue on error)
         for course in course_list:
             if not course.get('class_id') or not course.get('slot_param'): continue
             
             is_lab = 'LAB' in course.get('course_type', '').upper()
-            # Re-fetch CSRF just in case, though we are in a loop. 
-            # For performance, we reuse the session/token from above in this scope
-            
             detail_payload = {
                 'authorizedID': username, '_csrf': csrf_token,
                 'lSemesterSubId': semester_sub_id, 'classId': course['class_id'], 'slotName': course['slot_param']

@@ -1,12 +1,79 @@
 <section>
-    <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
+    <h2 class="text-3xl font-bold mb-8 text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
         Grades & Performance
     </h2>
-    <div class="bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="overflow-x-auto p-4">
-            <div class="raw-html-content text-gray-700 dark:text-gray-300">
-                {{ data_html | safe }}
+
+    {% if courses %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% for course in courses %}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-all">
+            <div class="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-900 dark:text-white leading-snug mb-1">{{ course.title }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 font-mono">{{ course.code }}</p>
+                    </div>
+                    <div class="flex flex-col items-end space-y-1">
+                        <span class="text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded">
+                            {{ course.type }}
+                        </span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ course.slot }}</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-500 mt-2 flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    {{ course.faculty }}
+                </p>
+            </div>
+
+            <div class="p-0">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-600 dark:text-gray-300">
+                        <thead class="text-xs text-gray-700 dark:text-gray-400 uppercase bg-gray-50/50 dark:bg-gray-800">
+                            <tr>
+                                <th class="px-5 py-3 font-medium">Assessment</th>
+                                <th class="px-5 py-3 font-medium text-center">Max</th>
+                                <th class="px-5 py-3 font-medium text-center">Scored</th>
+                                <th class="px-5 py-3 font-medium text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            {% for mark in course.assessments %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                <td class="px-5 py-3 font-medium text-gray-800 dark:text-gray-200">
+                                    {{ mark.title }}
+                                </td>
+                                <td class="px-5 py-3 text-center text-gray-500 dark:text-gray-400">
+                                    {{ mark.max_mark }}
+                                </td>
+                                <td class="px-5 py-3 text-center font-bold text-indigo-600 dark:text-indigo-400">
+                                    {{ mark.scored }}
+                                </td>
+                                <td class="px-5 py-3 text-right">
+                                    {% if mark.status == 'Present' %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                            P
+                                        </span>
+                                    {% elif mark.status == 'Absent' %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                                            Abs
+                                        </span>
+                                    {% else %}
+                                        <span class="text-xs text-gray-500">{{ mark.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
+        {% endfor %}
     </div>
+    {% else %}
+    <div class="p-12 text-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+        <p class="text-gray-500 dark:text-gray-400 text-lg">No grade information available for this semester.</p>
+    </div>
+    {% endif %}
 </section>
