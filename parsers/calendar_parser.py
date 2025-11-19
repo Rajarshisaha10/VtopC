@@ -10,76 +10,89 @@ def parse_academic_calendar(html_content):
 
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # 1. Extract Month and Year title (e.g., "SEPTEMBER 2025")
-    # It's usually in an h4 tag
+    # 1. Extract Month and Year title
     title_tag = soup.find('h4')
     month_title = title_tag.get_text(strip=True) if title_tag else "Calendar"
     
     # 2. Extract Calendar Grid
     calendar_data = []
     
-    # Find the main calendar table by class
     table = soup.find('table', class_='calendar-table')
     if not table:
-        # Fallback if class is missing but ID exists
         table = soup.find('table', id='calendar-table')
         
     if not table:
+        tables = soup.find_all('table')
+        table = tables[0] if tables else None
+
+    if not table:
         return {'month_title': month_title, 'days': []}
 
-    # Iterate through all rows
     rows = table.find_all('tr')
     
     for row in rows:
-        # Skip header rows that contain day names
+        # Skip header rows
         if "Sunday" in row.get_text():
             continue
             
         cells = row.find_all('td')
-        for cell in cells:
-            # Each cell represents a day
-            # Extract Day Number (it's in a span with float:left and bold font)
-            # We look for text that is a number
-            
-            # VTOP structure is often: <span>1</span> <span>Event</span>
-            
-            # Find the day number
+        
+        # Enumerate to get column index (0=Sun, 6=Sat)
+        for col_idx, cell in enumerate(cells):
             day_text = ""
             spans = cell.find_all('span')
             
-            # The first span usually holds the day number if it exists
-            # But sometimes it's empty if it's padding
             day_found = False
             events = []
+            all_text_content = "" # Combined text to check for keywords
             
             for span in spans:
                 text = span.get_text(strip=True)
-                style = span.get('style', '').lower()
-                
+                if not text: continue
+
                 # Check if this span is the day number
                 if not day_found and text.isdigit():
                     day_text = text
                     day_found = True
                     continue
                 
-                # If we have text that isn't a number, it's an event
-                if text and not text.isdigit():
-                    evt_type = 'general'
-                    if 'color: green' in style or 'green' in style:
-                        evt_type = 'instructional'
-                    elif '#eb556e' in style or 'red' in style:
-                        evt_type = 'holiday'
-                    
-                    events.append({'text': text, 'type': evt_type})
+                # It's an event text
+                if not text.isdigit():
+                    events.append({'text': text})
+                    all_text_content += " " + text.lower()
             
             if day_text:
+                # --- Determine Overall Status for Color Coding ---
+                # Default to general (white/gray)
+                status = 'general'
+                
+                # Priority 1: Explicit Holidays / No Instruction (Red)
+                if 'no instructional' in all_text_content or 'holiday' in all_text_content or 'vacation' in all_text_content:
+                    status = 'holiday'
+                
+                # Priority 2: Day Orders (Yellow) - Takes precedence over generic "Instructional"
+                elif 'order' in all_text_content:
+                    status = 'day_order'
+                
+                # Priority 3: Working Days (Green)
+                elif 'instructional' in all_text_content or 'working' in all_text_content or 'fid' in all_text_content:
+                    status = 'working'
+                
+                # Priority 4: Empty Weekends (Red)
+                # If status is still general (no events found above) and it's Sat(6) or Sun(0)
+                elif status == 'general' and (col_idx == 0 or col_idx == 6):
+                    status = 'holiday'
+                    if not events:
+                        events.append({'text': 'Holiday'})
+
                 calendar_data.append({
                     'day': int(day_text),
+                    'status': status,
                     'events': events
                 })
             else:
                 # Empty padding cell
-                calendar_data.append({'day': None, 'events': []})
+                calendar_data.append({'day': None, 'status': 'padding', 'events': []})
 
     return {
         'month_title': month_title,

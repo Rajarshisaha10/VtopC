@@ -32,33 +32,50 @@
 
         <div class="grid grid-cols-7 auto-rows-fr bg-gray-200 dark:bg-gray-600 gap-px border-b border-gray-200 dark:border-gray-600">
             {% for day_obj in calendar.days %}
-                <div class="bg-white dark:bg-gray-800 min-h-[120px] p-2 relative transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 flex flex-col">
-                    {% if day_obj.day %}
-                        <span class="text-sm font-bold text-gray-400 dark:text-gray-500 mb-2 block">
+                {# Define colors based on aggregated status #}
+                {% if day_obj.status == 'working' %}
+                    {# Green #}
+                    {% set cell_bg = "bg-green-100 dark:bg-green-900/40" %}
+                    {% set text_cls = "text-green-800 dark:text-green-200" %}
+                    {% set date_cls = "text-green-600 dark:text-green-300/70" %}
+                
+                {% elif day_obj.status == 'day_order' %}
+                    {# Yellow #}
+                    {% set cell_bg = "bg-yellow-100 dark:bg-yellow-900/40" %}
+                    {% set text_cls = "text-yellow-800 dark:text-yellow-200" %}
+                    {% set date_cls = "text-yellow-600 dark:text-yellow-300/70" %}
+
+                {% elif day_obj.status == 'holiday' %}
+                    {# Red #}
+                    {% set cell_bg = "bg-red-100 dark:bg-red-900/40" %}
+                    {% set text_cls = "text-red-800 dark:text-red-200" %}
+                    {% set date_cls = "text-red-600 dark:text-red-300/70" %}
+
+                {% else %}
+                    {# Default/Padding #}
+                    {% set cell_bg = "bg-white dark:bg-gray-800" %}
+                    {% set text_cls = "text-gray-600 dark:text-gray-400" %}
+                    {% set date_cls = "text-gray-400 dark:text-gray-600" %}
+                {% endif %}
+                
+                {% if not day_obj.day %}
+                    {# Empty padding cell #}
+                    <div class="bg-gray-50/50 dark:bg-gray-800/50 min-h-[100px]"></div>
+                {% else %}
+                    <div class="{{ cell_bg }} min-h-[100px] p-2 relative transition-colors flex flex-col justify-between hover:brightness-95 dark:hover:brightness-110">
+                        <span class="absolute top-2 left-2 text-sm font-bold {{ date_cls }}">
                             {{ day_obj.day }}
                         </span>
                         
-                        <div class="space-y-1 flex-1">
+                        <div class="mt-6 flex-1 flex flex-col items-center justify-center space-y-1">
                             {% for event in day_obj.events %}
-                                {% if event.type == 'instructional' %}
-                                    <div class="px-1.5 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-[10px] font-medium rounded border border-green-100 dark:border-green-800 leading-tight">
-                                        {{ event.text }}
-                                    </div>
-                                {% elif event.type == 'holiday' %}
-                                    <div class="px-1.5 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-[10px] font-medium rounded border border-red-100 dark:border-red-800 leading-tight">
-                                        {{ event.text }}
-                                    </div>
-                                {% else %}
-                                    <div class="px-1.5 py-1 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-[10px] font-medium rounded border border-gray-200 dark:border-gray-600 leading-tight">
-                                        {{ event.text }}
-                                    </div>
-                                {% endif %}
+                                <p class="text-[10px] font-bold text-center leading-tight {{ text_cls }}">
+                                    {{ event.text }}
+                                </p>
                             {% endfor %}
                         </div>
-                    {% else %}
-                        <div class="bg-gray-50/30 dark:bg-gray-800/30 w-full h-full"></div>
-                    {% endif %}
-                </div>
+                    </div>
+                {% endif %}
             {% endfor %}
         </div>
     </div>
