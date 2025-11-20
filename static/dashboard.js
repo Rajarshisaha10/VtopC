@@ -15,15 +15,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- State ---
     let currentSemesterId = null;
+    let cachedAttendance = []; 
+    let cachedTimetable = {};  
 
     // --- Elements ---
     const menuToggle = document.getElementById('menu-toggle');
     const sidebar = document.getElementById('sidebar');
     const navLinks = document.querySelectorAll('.nav-link');
-    const navLinkChildren = document.querySelectorAll('.nav-link-child'); // Combined selector
+    const navLinkChildren = document.querySelectorAll('.nav-link-child'); 
     const pageSections = document.querySelectorAll('.page-section');
     const academicsToggle = document.querySelector('[data-section="academics"]');
     const examinationsToggle = document.querySelector('[data-section="examinations"]');
+    const extraToggle = document.querySelector('[data-section="extra"]'); 
     
     const semesterSelect = document.getElementById('semester-select');
     const logoutBtn = document.getElementById('logoutBtn');
@@ -44,8 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const enrollmentContainer = document.getElementById('enrollment-container');
     const hostelContainer = document.getElementById('hostel-container');
     const profileContainer = document.getElementById('profile-container');
-    
-    // Snapshot Elements
+    const calculatorContainer = document.getElementById('extra-calculator'); 
+
     const snapshotAttPerc = document.getElementById('snapshot-attendance-perc');
     const snapshotAttBar = document.getElementById('snapshot-attendance-bar');
     const snapshotOdCount = document.getElementById('snapshot-od-count');
@@ -55,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
         todayScheduleContainer, timetableContainer, coursesContainer,
         attendanceContainer, marksContainer, examScheduleContainer, curriculumContainer,
         projectsContainer, calendarContainer, enrollmentContainer,
-        hostelContainer, profileContainer
+        hostelContainer, profileContainer, calculatorContainer
     ];
 
     // Modal
@@ -65,34 +68,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalBody = document.getElementById('modal-body');
     const modalCloseBtn = document.getElementById('modal-close-btn');
 
-    
     // --- Navigation ---
     function showPageSection(sectionId) {
         pageSections.forEach(section => {
             section.style.display = section.id === sectionId ? 'block' : 'none';
         });
-        // Toggle active state for main nav links
         navLinks.forEach(l => l.classList.toggle('active', l.dataset.section === sectionId));
         
-        // Keep dropdown parents active if a child is active
         if (sectionId === 'academics' && academicsToggle) academicsToggle.classList.add('active');
         if (sectionId === 'examinations' && examinationsToggle) examinationsToggle.classList.add('active');
+        if (sectionId === 'extra' && extraToggle) extraToggle.classList.add('active');
     }
 
     function showSubsection(parentId, subsectionId) {
-        // Find the parent section (e.g., #academics)
         const parentSection = document.getElementById(parentId);
         if (!parentSection) return;
-
-        // Hide all subsections inside this parent
         const subsections = parentSection.querySelectorAll(`.${parentId}-subsection`);
         subsections.forEach(sub => sub.style.display = 'none');
         
-        // Show the target subsection
         const targetSub = document.getElementById(subsectionId);
         if (targetSub) targetSub.style.display = 'block';
 
-        // Update nav link states
         navLinkChildren.forEach(l => {
             l.classList.toggle('active-subsection', l.dataset.subsection === subsectionId);
         });
@@ -102,11 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeNav = document.querySelector('.nav-link.active');
         const activeSubNav = document.querySelector('.nav-link-child.active-subsection');
         
-        // If it's a direct main link (not a dropdown parent)
-        if (activeNav && !['academics', 'examinations'].includes(activeNav.dataset.section)) {
+        if (activeNav && !['academics', 'examinations', 'extra'].includes(activeNav.dataset.section)) {
             return { type: 'section', id: activeNav.dataset.section };
         }
-        // If a subsection is active
         if (activeSubNav) {
             return { type: 'subsection', id: activeSubNav.dataset.subsection };
         }
@@ -114,9 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clearAllDataContainers() {
-        allDataContainers.forEach(container => {
-            if (container) container.innerHTML = ''; 
-        });
+        allDataContainers.forEach(container => { if (container) container.innerHTML = ''; });
         if (snapshotAttPerc) snapshotAttPerc.textContent = '...';
         if (snapshotAttBar) snapshotAttBar.style.width = '0%';
         if (snapshotOdCount) snapshotOdCount.textContent = '... / 40';
@@ -124,15 +116,197 @@ document.addEventListener('DOMContentLoaded', () => {
         if (todayScheduleContainer) todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Loading today\'s schedule...</p>';
     }
 
-    // Calendar Navigation Listener
-    calendarContainer.addEventListener('click', (e) => {
-        const navBtn = e.target.closest('.calendar-nav-btn');
-        if (navBtn) {
-            const targetDate = navBtn.dataset.date;
-            fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar", { calDate: targetDate });
-        }
-    });
+    // --- CALCULATOR LOGIC ---
+    function renderCalculator() {
+        calculatorContainer.innerHTML = `
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">Attendance Calculator</h2>
+            
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div class="flex border-b border-gray-200 dark:border-gray-700">
+                    <button id="calc-tab-subject" class="flex-1 py-4 text-sm font-medium text-center text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 dark:text-indigo-400 transition-colors">Subject Wise</button>
+                    <button id="calc-tab-days" class="flex-1 py-4 text-sm font-medium text-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">Days / Dates</button>
+                </div>
 
+                <div id="calc-view-subject" class="p-6">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Predict attendance by manually adding classes to a specific subject.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Subject</label>
+                            <select id="calc-subject-select" class="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"></select>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Attend Next</label>
+                                <input type="number" id="calc-attend" value="0" min="0" class="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Miss Next</label>
+                                <input type="number" id="calc-miss" value="0" min="0" class="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="calc-subject-result" class="mt-6 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg hidden border border-gray-100 dark:border-gray-700"></div>
+                </div>
+
+                <div id="calc-view-days" class="p-6 hidden">
+                     <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Predict attendance by simulating future days based on your specific timetable.</p>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date</label>
+                            <input type="date" id="calc-start-date" class="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date</label>
+                            <input type="date" id="calc-end-date" class="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status for these days</label>
+                            <select id="calc-day-status" class="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                <option value="present">Attend All</option>
+                                <option value="absent">Miss All</option>
+                            </select>
+                        </div>
+                         <div class="flex items-end">
+                            <button id="calc-days-btn" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-sm">Calculate Prediction</button>
+                        </div>
+                     </div>
+                     <div id="calc-days-result" class="mt-6 hidden space-y-3"></div>
+                </div>
+            </div>
+        </div>`;
+
+        const subjectSelect = document.getElementById('calc-subject-select');
+        cachedAttendance.forEach((course, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `${course.course_code} - ${course.course_title}`;
+            subjectSelect.appendChild(option);
+        });
+
+        const tabSubject = document.getElementById('calc-tab-subject');
+        const tabDays = document.getElementById('calc-tab-days');
+        const viewSubject = document.getElementById('calc-view-subject');
+        const viewDays = document.getElementById('calc-view-days');
+
+        function switchTab(isSubject) {
+            if (isSubject) {
+                viewSubject.classList.remove('hidden'); viewDays.classList.add('hidden');
+                tabSubject.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600', 'bg-indigo-50', 'dark:bg-indigo-900/20', 'dark:text-indigo-400');
+                tabSubject.classList.remove('text-gray-500', 'hover:text-gray-700', 'dark:text-gray-400');
+                tabDays.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600', 'bg-indigo-50', 'dark:bg-indigo-900/20', 'dark:text-indigo-400');
+                tabDays.classList.add('text-gray-500', 'hover:text-gray-700', 'dark:text-gray-400');
+            } else {
+                viewDays.classList.remove('hidden'); viewSubject.classList.add('hidden');
+                tabDays.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600', 'bg-indigo-50', 'dark:bg-indigo-900/20', 'dark:text-indigo-400');
+                tabDays.classList.remove('text-gray-500', 'hover:text-gray-700', 'dark:text-gray-400');
+                tabSubject.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600', 'bg-indigo-50', 'dark:bg-indigo-900/20', 'dark:text-indigo-400');
+                tabSubject.classList.add('text-gray-500', 'hover:text-gray-700', 'dark:text-gray-400');
+            }
+        }
+        tabSubject.addEventListener('click', () => switchTab(true));
+        tabDays.addEventListener('click', () => switchTab(false));
+
+        function updateSubjectCalc() {
+            const idx = subjectSelect.value;
+            const attend = parseInt(document.getElementById('calc-attend').value) || 0;
+            const miss = parseInt(document.getElementById('calc-miss').value) || 0;
+            if (cachedAttendance[idx]) {
+                const course = cachedAttendance[idx];
+                const currentAttended = parseInt(course.attended_classes);
+                const currentTotal = parseInt(course.total_classes);
+                
+                const newAttended = currentAttended + attend;
+                const newTotal = currentTotal + attend + miss;
+                const newPerc = (newAttended / newTotal * 100).toFixed(2);
+                
+                const resultDiv = document.getElementById('calc-subject-result');
+                resultDiv.classList.remove('hidden');
+                
+                let colorClass = newPerc >= 75 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                resultDiv.innerHTML = `
+                    <div class="flex flex-col sm:flex-row justify-between items-center gap-2">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Current: <strong>${course.percentage}</strong> (${course.attended_classes}/${course.total_classes})</span>
+                        <span class="text-lg font-bold ${colorClass}">Prediction: ${newPerc}% <span class="text-xs text-gray-500 font-normal">(${newAttended}/${newTotal})</span></span>
+                    </div>
+                `;
+            }
+        }
+        
+        document.getElementById('calc-attend').addEventListener('input', updateSubjectCalc);
+        document.getElementById('calc-miss').addEventListener('input', updateSubjectCalc);
+        subjectSelect.addEventListener('change', updateSubjectCalc);
+
+        document.getElementById('calc-days-btn').addEventListener('click', () => {
+            const startDateVal = document.getElementById('calc-start-date').value;
+            const endDateVal = document.getElementById('calc-end-date').value;
+            const status = document.getElementById('calc-day-status').value;
+            
+            if (!startDateVal || !endDateVal) { alert("Please select dates."); return; }
+            
+            const start = new Date(startDateVal);
+            const end = new Date(endDateVal);
+            
+            let tempAttendance = JSON.parse(JSON.stringify(cachedAttendance));
+            const dayMap = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+            
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const dayName = dayMap[d.getDay()];
+                if (cachedTimetable[dayName]) {
+                    const daySchedule = cachedTimetable[dayName];
+                    const coursesInDay = new Set();
+                    Object.values(daySchedule).forEach(slot => { if (slot.code) coursesInDay.add(slot.code); });
+                    
+                    coursesInDay.forEach(code => {
+                        const courseIdx = tempAttendance.findIndex(c => c.course_code === code);
+                        if (courseIdx !== -1) {
+                             // Simple approximation: 1 slot = 1 class. 
+                             // If a course has 2 slots in a day (e.g., 2 hours), it counts as 2.
+                             let classesInDay = 0;
+                             Object.values(daySchedule).forEach(s => { if(s.code === code) classesInDay++; });
+
+                             tempAttendance[courseIdx].total_classes = parseInt(tempAttendance[courseIdx].total_classes) + classesInDay;
+                             if (status === 'present') {
+                                 tempAttendance[courseIdx].attended_classes = parseInt(tempAttendance[courseIdx].attended_classes) + classesInDay;
+                             }
+                        }
+                    });
+                }
+            }
+            
+            const resDiv = document.getElementById('calc-days-result');
+            resDiv.innerHTML = '';
+            resDiv.classList.remove('hidden');
+            
+            tempAttendance.forEach(course => {
+                const original = cachedAttendance.find(c => c.course_code === course.course_code);
+                if (original && original.total_classes != course.total_classes) {
+                    const newPerc = (course.attended_classes / course.total_classes * 100).toFixed(2);
+                    const colorClass = newPerc >= 75 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                    
+                    resDiv.innerHTML += `
+                        <div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 flex justify-between items-center shadow-sm">
+                            <div>
+                                <p class="font-bold text-sm dark:text-white mb-0.5">${course.course_code}</p>
+                                <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                    <span>${original.percentage}</span>
+                                    <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                                    <span class="${colorClass} font-bold text-sm">${newPerc}%</span>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-400 font-mono">
+                                ${course.attended_classes}/${course.total_classes}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            if (resDiv.innerHTML === '') resDiv.innerHTML = '<p class="text-sm text-gray-500 text-center italic">No classes found in schedule for these dates.</p>';
+            lucide.createIcons();
+        });
+    }
+
+    // --- REFRESH LOGIC ---
     function refreshCurrentPage() {
         clearAllDataContainers();
         const activePage = getActivePage();
@@ -155,66 +329,126 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
             }
         } else if (activePage.type === 'subsection') {
-            switch (activePage.id) {
-                // Academics
-                case 'academics-courses':
-                case 'academics-timetable':
-                    fetchTimetableAndCourses();
-                    break;
-                case 'academics-attendance':
-                    fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
-                    break;
-                case 'academics-calendar':
-                    fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar");
-                    break;
-                case 'academics-curriculum':
-                    fetchAndDisplay(CURRICULUM_TARGET, curriculumContainer, "My Curriculum");
-                    break;
-                case 'academics-projects':
-                    fetchAndDisplay(PROJECTS_TARGET, projectsContainer, "Projects");
-                    break;
-                
-                // Examinations
-                case 'examinations-marks':
-                    fetchAndDisplay(MARKS_TARGET, marksContainer, "Marks");
-                    break;
-                case 'examinations-schedule':
-                    fetchAndDisplay(EXAM_SCHEDULE_TARGET, examScheduleContainer, "Exam Schedule");
-                    break;
+            if (activePage.id === 'extra-calculator') {
+                if (cachedAttendance.length === 0 || Object.keys(cachedTimetable).length === 0) {
+                     calculatorContainer.innerHTML = '<div class="p-8 text-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-2"></i><p class="text-gray-500">Fetching data for calculator...</p></div>';
+                     lucide.createIcons();
+                     Promise.all([fetchAttendanceForCache(), fetchTimetableForCache()]).then(() => {
+                         renderCalculator();
+                     });
+                } else {
+                    renderCalculator();
+                }
+            } else {
+                // Trigger sub-section fetches
+                const link = document.querySelector(`.nav-link-child[data-subsection="${activePage.id}"]`);
+                if (link) link.click(); 
             }
         }
     }
 
-    // Main Nav Listeners
+    async function fetchAttendanceForCache() {
+        const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), target: ATTENDANCE_TARGET, semesterSubId: currentSemesterId })
+        });
+        const data = await response.json();
+        if (data.status === 'success') cachedAttendance = data.raw_data;
+    }
+    
+    async function fetchTimetableForCache() {
+         const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), target: TIMETABLE_TARGET, semesterSubId: currentSemesterId })
+        });
+        const data = await response.json();
+        if (data.status === 'success') cachedTimetable = data.raw_data.timetable;
+    }
+
+    // Overwrite to cache data
+    async function fetchAndCalculateAttendanceSnapshot() {
+        if (!currentSemesterId) return; 
+        try {
+            const currentSessionId = localStorage.getItem('vtop_session_id');
+            const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: currentSessionId, target: ATTENDANCE_TARGET, semesterSubId: currentSemesterId })
+            });
+            const data = await response.json();
+            if (data.status === 'success' && data.raw_data) {
+                cachedAttendance = data.raw_data; 
+                let totalAttended = 0, totalConducted = 0;
+                data.raw_data.forEach(course => {
+                    const attended = parseInt(course.attended_classes, 10);
+                    const total = parseInt(course.total_classes, 10);
+                    if (!isNaN(attended) && !isNaN(total)) { totalAttended += attended; totalConducted += total; }
+                });
+                let percentage = 0;
+                if (totalConducted > 0) percentage = (totalAttended / totalConducted) * 100;
+                if (snapshotAttPerc) {
+                     snapshotAttPerc.textContent = `${percentage.toFixed(0)}%`;
+                     snapshotAttBar.style.width = `${percentage.toFixed(0)}%`;
+                }
+            }
+        } catch (error) { console.error(error); }
+    }
+
+    async function fetchTimetableAndCourses() {
+        if (!currentSemesterId) return;
+        try {
+            const currentSessionId = localStorage.getItem('vtop_session_id');
+            const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: currentSessionId, target: TIMETABLE_TARGET, semesterSubId: currentSemesterId })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                cachedTimetable = data.raw_data.timetable;
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(data.html_content, 'text/html');
+                const coursesContent = doc.getElementById('registered-courses-content');
+                const timetableContent = doc.getElementById('weekly-timetable-content');
+                if (coursesContainer) coursesContainer.innerHTML = ''; 
+                if (coursesContent) coursesContainer.appendChild(coursesContent);
+                if (timetableContainer) timetableContainer.innerHTML = ''; 
+                if (timetableContent) timetableContainer.appendChild(timetableContent);
+                populateTodaySchedule(data.raw_data.timetable);
+                lucide.createIcons(); 
+            }
+        } catch (error) { handleFetchError(error, timetableContainer); }
+    }
+    
+    // --- Navigation & Init ---
     navLinks.forEach(link => {
-        if (link === academicsToggle || link === examinationsToggle) return; // Skip dropdown toggles
-        
+        if (link === academicsToggle || link === examinationsToggle || link === extraToggle) return;
         link.addEventListener('click', (e) => {
             e.preventDefault();
             showPageSection(link.dataset.section);
             const section = link.dataset.section;
-            
-            if (section === 'enrollment') fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
-            else if (section === 'hostel') fetchAndDisplay(HOSTEL_TARGET, hostelContainer, "Hostel");
+            if (section === 'hostel') fetchAndDisplay(HOSTEL_TARGET, hostelContainer, "Hostel");
             else if (section === 'profile') fetchAndDisplay(PROFILE_TARGET, profileContainer, "Profile");
             else if (section === 'dashboard') refreshCurrentPage();
-
             if (window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
             contentContainer.scrollTop = 0;
         });
     });
 
-    // Subsection Nav Listeners (Handles both Academics and Examinations)
     navLinkChildren.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const parentId = link.dataset.parent;
             const subsectionId = link.dataset.subsection;
-            
             showPageSection(parentId);
             showSubsection(parentId, subsectionId);
             
-            if (subsectionId === 'academics-attendance') fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
+            if (subsectionId === 'extra-calculator') {
+                if (cachedAttendance.length === 0 || Object.keys(cachedTimetable).length === 0) {
+                     calculatorContainer.innerHTML = '<div class="p-8 text-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-2"></i><p class="text-gray-500">Fetching data for calculator...</p></div>';
+                     lucide.createIcons();
+                     Promise.all([fetchAttendanceForCache(), fetchTimetableForCache()]).then(() => { renderCalculator(); });
+                } else { renderCalculator(); }
+            }
+            else if (subsectionId === 'academics-attendance') fetchAndDisplay(ATTENDANCE_TARGET, attendanceContainer, "Attendance");
             else if (subsectionId === 'academics-calendar') fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar");
             else if (subsectionId === 'academics-curriculum') fetchAndDisplay(CURRICULUM_TARGET, curriculumContainer, "My Curriculum");
             else if (subsectionId === 'academics-projects') fetchAndDisplay(PROJECTS_TARGET, projectsContainer, "Projects");
@@ -227,270 +461,80 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     menuToggle.addEventListener('click', () => sidebar.classList.toggle('-translate-x-full'));
-
     const themeToggle = document.getElementById('theme-toggle');
-    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    }
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
     themeToggle.addEventListener('click', () => {
         const isDark = document.documentElement.classList.toggle('dark');
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
     });
-
+    
+    // ... (Existing modal, fetch details, semester select, logout code) ...
     function handleFetchError(error, container) {
         console.error('Fetch error:', error);
-        if (error.message.includes("Session expired")) {
-             localStorage.removeItem('vtop_session_id');
-             window.location.href = '/login';
-        } else if (container) {
-             container.innerHTML = `<p class="text-red-500 text-sm">Error: ${error.message}</p>`;
-        }
+        if (error.message.includes("Session expired")) { localStorage.removeItem('vtop_session_id'); window.location.href = '/login'; } 
+        else if (container) { container.innerHTML = `<p class="text-red-500 text-sm">Error: ${error.message}</p>`; }
     }
 
     async function fetchAndDisplay(target, containerElement, title, extraParams = {}) {
         containerElement.innerHTML = `<p class="text-sm text-gray-500 flex items-center"><i data-lucide="loader" class="animate-spin h-5 w-5 mr-2 text-indigo-600"></i> Loading ${title || 'content'}...</p>`;
         lucide.createIcons(); 
-
         try {
             const currentSessionId = localStorage.getItem('vtop_session_id');
-            if (!currentSessionId) throw new Error("No session ID");
-
-            const payload = { 
-                session_id: currentSessionId, 
-                target: target,
-                semesterSubId: currentSemesterId,
-                ...extraParams 
-            };
-
-            const response = await fetch(`${API_BASE_URL}/fetch-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                if (response.status === 401) throw new Error("Session expired. Redirecting to login.");
-                throw new Error(`Server error: ${response.status}`);
-            }
-
+            const payload = { session_id: currentSessionId, target: target, semesterSubId: currentSemesterId, ...extraParams };
+            const response = await fetch(`${API_BASE_URL}/fetch-data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error("Server error");
             const data = await response.json();
-            if (data.status === 'success') {
-                containerElement.innerHTML = data.html_content;
-                lucide.createIcons(); 
-            } else {
-                 throw new Error(data.message || "Failed to fetch data.");
-            }
-        } catch (error) {
-            handleFetchError(error, containerElement);
-        }
+            if (data.status === 'success') { containerElement.innerHTML = data.html_content; lucide.createIcons(); } 
+            else { throw new Error(data.message); }
+        } catch (error) { handleFetchError(error, containerElement); }
     }
 
     async function checkSession() {
         const savedSessionId = localStorage.getItem('vtop_session_id');
         if (!savedSessionId) { window.location.href = '/login'; return; }
-
         try {
-            const response = await fetch(`${API_BASE_URL}/check-session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: savedSessionId })
-            });
-
-            if (!response.ok) throw new Error('Session validation failed.');
+            const response = await fetch(`${API_BASE_URL}/check-session`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: savedSessionId }) });
+            if (!response.ok) throw new Error();
             const data = await response.json();
-
-            if (data.status === 'success') {
-                sidebarUsername.textContent = data.username;
-                sidebarRegNo.textContent = data.username; 
-                populateSemesterDropdown(); 
-            } else {
-                localStorage.removeItem('vtop_session_id');
-                window.location.href = '/login';
-            }
-        } catch (error) {
-            localStorage.removeItem('vtop_session_id');
-            window.location.href = '/login';
-        }
+            if (data.status === 'success') { sidebarUsername.textContent = data.username; sidebarRegNo.textContent = data.username; populateSemesterDropdown(); } 
+            else { localStorage.removeItem('vtop_session_id'); window.location.href = '/login'; }
+        } catch (error) { localStorage.removeItem('vtop_session_id'); window.location.href = '/login'; }
     }
 
     async function populateSemesterDropdown() {
         try {
-            const currentSessionId = localStorage.getItem('vtop_session_id');
-            const response = await fetch(`${API_BASE_URL}/get-semesters`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId })
-            });
-
-            if (!response.ok) throw new Error('Failed to fetch semesters');
+            const response = await fetch(`${API_BASE_URL}/get-semesters`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id') }) });
             const data = await response.json();
-            
             if (data.status === 'success' && data.semesters.length > 0) {
                 semesterSelect.innerHTML = ''; 
-                data.semesters.forEach(semester => {
-                    const option = document.createElement('option');
-                    option.value = semester.id;
-                    option.textContent = semester.name;
-                    semesterSelect.appendChild(option);
-                });
+                data.semesters.forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.name; semesterSelect.appendChild(opt); });
                 currentSemesterId = data.semesters[0].id;
-                
-                // Only load dashboard default items (not all tabs)
-                fetchTimetableAndCourses();
-                fetchAndCalculateAttendanceSnapshot();
-                fetchAndDisplayODSnapshot();
-            } else {
-                throw new Error(data.message || 'Could not load semesters');
+                fetchTimetableAndCourses(); fetchAndCalculateAttendanceSnapshot(); fetchAndDisplayODSnapshot();
             }
-        } catch (error) {
-            semesterSelect.innerHTML = '<option>Error loading</option>';
-            console.error("Failed to populate semesters:", error);
-        }
+        } catch (error) { console.error(error); }
     }
 
-    async function fetchAndCalculateAttendanceSnapshot() {
-        if (!currentSemesterId) return; 
-        try {
-            const currentSessionId = localStorage.getItem('vtop_session_id');
-            const response = await fetch(`${API_BASE_URL}/fetch-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId, target: ATTENDANCE_TARGET, semesterSubId: currentSemesterId })
-            });
-            if (!response.ok) throw new Error('Failed to fetch attendance');
-            const data = await response.json();
-            if (data.status === 'success' && data.raw_data) {
-                let totalAttended = 0;
-                let totalConducted = 0;
-                data.raw_data.forEach(course => {
-                    const attended = parseInt(course.attended_classes, 10);
-                    const total = parseInt(course.total_classes, 10);
-                    if (!isNaN(attended) && !isNaN(total)) { totalAttended += attended; totalConducted += total; }
-                });
-                let percentage = 0;
-                if (totalConducted > 0) percentage = (totalAttended / totalConducted) * 100;
-                if (snapshotAttPerc && snapshotAttBar) {
-                    if (totalConducted === 0) { snapshotAttPerc.textContent = 'N/A'; snapshotAttBar.style.width = '0%'; }
-                    else { snapshotAttPerc.textContent = `${percentage.toFixed(0)}%`; snapshotAttBar.style.width = `${percentage.toFixed(0)}%`; }
-                }
-            }
-        } catch (error) { console.error('Error calculating attendance snapshot:', error); if (snapshotAttPerc) snapshotAttPerc.textContent = 'Err'; }
-    }
-
-    async function fetchAndDisplayODSnapshot() {
-        if (!currentSemesterId) return;
-        if (snapshotOdCount) snapshotOdCount.textContent = '... / 40';
-        if (snapshotOdBar) snapshotOdBar.style.width = '0%';
-        try {
-            const currentSessionId = localStorage.getItem('vtop_session_id');
-            const response = await fetch(`${API_BASE_URL}/get-od-snapshot`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId, semesterSubId: currentSemesterId })
-            });
-            if (!response.ok) throw new Error('Failed to fetch OD data');
-            const data = await response.json();
-            if (data.status === 'success') {
-                const odCount = data.total_od_count;
-                const odPercentage = (odCount / 40) * 100;
-                if (snapshotOdCount && snapshotOdBar) { snapshotOdCount.textContent = `${odCount} / 40`; snapshotOdBar.style.width = `${Math.min(odPercentage, 100)}%`; }
-            } else { throw new Error(data.message || 'Failed to get OD count'); }
-        } catch (error) { console.error('Error fetching OD snapshot:', error); if (snapshotOdCount) snapshotOdCount.textContent = 'Err / 40'; }
-    }
-
-    async function fetchTimetableAndCourses() {
-        if (!currentSemesterId) return;
-        try {
-            const currentSessionId = localStorage.getItem('vtop_session_id');
-            const response = await fetch(`${API_BASE_URL}/fetch-data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId, target: TIMETABLE_TARGET, semesterSubId: currentSemesterId })
-            });
-
-            if (!response.ok) {
-                 if (response.status === 401) throw new Error("Session expired. Redirecting to login.");
-                 throw new Error(`Server error: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (data.status === 'success') {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(data.html_content, 'text/html');
-                const coursesContent = doc.getElementById('registered-courses-content');
-                const timetableContent = doc.getElementById('weekly-timetable-content');
-
-                if (coursesContent) { coursesContainer.innerHTML = ''; coursesContainer.appendChild(coursesContent); }
-                else { coursesContainer.innerHTML = '<p class="text-red-500">Could not parse registered courses.</p>'; }
-                
-                if (timetableContent) { timetableContainer.innerHTML = ''; timetableContainer.appendChild(timetableContent); }
-                else { timetableContainer.innerHTML = '<p class="text-red-500">Could not parse timetable.</p>'; }
-                
-                populateTodaySchedule(data.raw_data.timetable);
-                lucide.createIcons(); 
-            } else { throw new Error(data.message || "Failed to fetch data."); }
-        } catch (error) {
-            handleFetchError(error, timetableContainer);
-            if (coursesContainer) handleFetchError(error, coursesContainer);
-            if (todayScheduleContainer) handleFetchError(error, todayScheduleContainer);
-        }
-    }
-    
     function populateTodaySchedule(timetableData) {
-        if (!timetableData) { todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">Could not load timetable data for dashboard card.</p>'; return; }
-        const time_slot_keys = [
-            "08:00 - 08:50", "08:55 - 09:45", "09:50 - 10:40", "10:45 - 11:35",
-            "11:40 - 12:30", "12:35 - 13:25", "LUNCH", "14:00 - 14:50",
-            "14:55 - 15:45", "15:50 - 16:40", "16:45 - 17:35", "17:40 - 18:30",
-            "18:35 - 19:25"
-        ];
+        if (!timetableData) { todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">Could not load timetable.</p>'; return; }
+        const time_slot_keys = ["08:00 - 08:50", "08:55 - 09:45", "09:50 - 10:40", "10:45 - 11:35", "11:40 - 12:30", "12:35 - 13:25", "LUNCH", "14:00 - 14:50", "14:55 - 15:45", "15:50 - 16:40", "16:45 - 17:35", "17:40 - 18:30", "18:35 - 19:25"];
         const dayMap = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-        const today = new Date();
-        const todayDayString = dayMap[today.getDay()];
+        const todayDayString = dayMap[new Date().getDay()];
         const todaySchedule = timetableData[todayDayString];
-        let classCount = 0;
-        let finalHtml = '';
+        let classCount = 0; let finalHtml = '';
 
         time_slot_keys.forEach((slotKey, index) => {
             if (todaySchedule && todaySchedule[slotKey] && todaySchedule[slotKey].rowspan) {
                 classCount++;
                 const course = todaySchedule[slotKey];
-                const rowspan = course.rowspan;
-                const startTime = slotKey.split(' - ')[0];
-                const endIndex = index + rowspan - 1;
-                const endTime = (time_slot_keys[endIndex] || "N/A").split(' - ')[1];
-                finalHtml += `
-                    <div class="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors">
-                        <div class="w-16 text-center border-r border-gray-200 dark:border-gray-600 pr-3">
-                            <p class="font-bold text-indigo-600 dark:text-indigo-400">${startTime}</p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">${endTime}</p>
-                        </div>
-                        <div class="ml-4 flex-grow">
-                            <p class="font-semibold text-gray-900 dark:text-white">${course.title}</p>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">${course.code} (${course.type})</p>
-                        </div>
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">${course.venue}</span>
-                    </div>
-                `;
+                const endTime = (time_slot_keys[index + course.rowspan - 1] || "N/A").split(' - ')[1];
+                finalHtml += `<div class="flex items-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"><div class="w-16 text-center border-r border-gray-200 dark:border-gray-600 pr-3"><p class="font-bold text-indigo-600 dark:text-indigo-400">${slotKey.split(' - ')[0]}</p><p class="text-xs text-gray-500 dark:text-gray-400">${endTime}</p></div><div class="ml-4 flex-grow"><p class="font-semibold text-gray-900 dark:text-white">${course.title}</p><p class="text-xs text-gray-500 dark:text-gray-400">${course.code} (${course.type})</p></div><span class="text-sm font-medium text-gray-700 dark:text-gray-300">${course.venue}</span></div>`;
             }
         });
-        if (classCount === 0) { todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 p-2">No classes scheduled for today.</p>'; } 
-        else { todayScheduleContainer.innerHTML = finalHtml; }
-    }
-    
-    function showModal(title, body) {
-        modalTitle.textContent = title;
-        modalBody.innerHTML = body;
-        modal.classList.remove('hidden');
-        setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95', 'opacity-0'); }, 10);
+        todayScheduleContainer.innerHTML = classCount === 0 ? '<p class="text-sm text-gray-500 dark:text-gray-400 p-2">No classes scheduled for today.</p>' : finalHtml;
     }
 
-    function closeModal() {
-        modal.classList.add('opacity-0');
-        modalContent.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => modal.classList.add('hidden'), 250);
-    }
-
+    function showModal(title, body) { modalTitle.textContent = title; modalBody.innerHTML = body; modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95', 'opacity-0'); }, 10); }
+    function closeModal() { modal.classList.add('opacity-0'); modalContent.classList.add('scale-95', 'opacity-0'); setTimeout(() => modal.classList.add('hidden'), 250); }
     modalCloseBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
@@ -499,41 +543,34 @@ document.addEventListener('DOMContentLoaded', () => {
         buttonElement.innerHTML = '<i data-lucide="loader" class="animate-spin h-4 w-4"></i>';
         lucide.createIcons();
         try {
-            const currentSessionId = localStorage.getItem('vtop_session_id');
-            const response = await fetch(`${API_BASE_URL}/fetch-attendance-detail`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: currentSessionId, class_id: classId, slot: slot, semesterSubId: currentSemesterId })
-            });
-            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+            const response = await fetch(`${API_BASE_URL}/fetch-attendance-detail`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), class_id: classId, slot: slot, semesterSubId: currentSemesterId }) });
             const data = await response.json();
             if (data.status === 'success') showModal(`Attendance: ${courseTitle}`, data.html_content);
-            else throw new Error(data.message || "Failed to get details.");
-        } catch (error) {
-            alert(error.message);
-            if (error.message.includes("Session expired")) handleFetchError(error, contentContainer);
-        } finally { buttonElement.innerHTML = originalText; }
+        } catch (error) { alert(error.message); } finally { buttonElement.innerHTML = originalText; }
     }
 
     contentContainer.addEventListener('click', (e) => {
-        const targetButton = e.target.closest('.view-attendance-detail');
-        if (targetButton) {
-            e.preventDefault();
-            fetchAttendanceDetail(targetButton.dataset.classId, targetButton.dataset.slot, targetButton.dataset.courseTitle, targetButton);
-        }
+        const btn = e.target.closest('.view-attendance-detail');
+        if (btn) { e.preventDefault(); fetchAttendanceDetail(btn.dataset.classId, btn.dataset.slot, btn.dataset.courseTitle, btn); }
     });
 
-    semesterSelect.addEventListener('change', () => {
-        currentSemesterId = semesterSelect.value;
-        refreshCurrentPage();
-    });
-
+    async function fetchAndDisplayODSnapshot() {
+        if (!currentSemesterId) return;
+        try {
+            const response = await fetch(`${API_BASE_URL}/get-od-snapshot`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), semesterSubId: currentSemesterId }) });
+            const data = await response.json();
+            if (data.status === 'success' && snapshotOdCount) {
+                snapshotOdCount.textContent = `${data.total_od_count} / 40`;
+                snapshotOdBar.style.width = `${Math.min((data.total_od_count / 40) * 100, 100)}%`;
+            }
+        } catch (e) { console.error(e); }
+    }
+    
+    semesterSelect.addEventListener('change', () => { currentSemesterId = semesterSelect.value; refreshCurrentPage(); });
     logoutBtn.addEventListener('click', async (e) => { 
-        e.preventDefault();
-        const currentSessionId = localStorage.getItem('vtop_session_id');
-        await fetch(`${API_BASE_URL}/logout`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: currentSessionId}) }); 
-        localStorage.removeItem('vtop_session_id');
-        window.location.href = '/login';
+        e.preventDefault(); 
+        await fetch(`${API_BASE_URL}/logout`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: localStorage.getItem('vtop_session_id')}) }); 
+        localStorage.removeItem('vtop_session_id'); window.location.href = '/login'; 
     });
 
     lucide.createIcons();

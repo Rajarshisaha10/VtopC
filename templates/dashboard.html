@@ -95,10 +95,17 @@
                     <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="examinations" data-subsection="examinations-schedule">Exam Schedule</a>
                 </div>
             </div>
-            
-            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-section="enrollment">
-                <i data-lucide="book-marked" class="mr-3 h-5 w-5"></i> Course Enrollment
-            </a>
+
+            <div x-data="{ open: false }" class="space-y-1">
+                <button @click="open = !open" class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-section="extra">
+                    <div class="flex items-center"><i data-lucide="plus-circle" class="mr-3 h-5 w-5"></i> Extra Options</div>
+                    <i data-lucide="chevron-down" class="h-4 w-4 transition-transform duration-200" :class="{'rotate-180': open}"></i>
+                </button>
+                <div x-show="open" class="pl-11 space-y-1">
+                    <a href="#" class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-parent="extra" data-subsection="extra-calculator">Attendance Calculator</a>
+                </div>
+            </div>
+
             <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-section="hostel">
                 <i data-lucide="home" class="mr-3 h-5 w-5"></i> Hostel Life
             </a>
@@ -199,7 +206,11 @@
                 <div id="examinations-schedule" class="hidden examinations-subsection"><div id="exam-schedule-container"></div></div>
             </div>
 
-            <div id="enrollment" class="hidden page-section"><div id="enrollment-container"></div></div>
+            <div id="extra" class="hidden page-section">
+                 <div id="extra-calculator" class="extra-subsection">
+                    </div>
+            </div>
+
             <div id="hostel" class="hidden page-section"><div id="hostel-container"></div></div>
             <div id="profile" class="hidden page-section"><div id="profile-container"></div></div>
         </div>
