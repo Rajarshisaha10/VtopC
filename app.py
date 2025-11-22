@@ -10,6 +10,9 @@ from data_routes import data_bp
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
 
+# Secure secret key for signing cookies (required for the secure auto-login)
+app.secret_key = os.environ.get('SECRET_KEY', 'vtopc_default_secret_key_change_this_in_prod')
+
 # Add whitenoise
 app.wsgi_app = WhiteNoise(app.wsgi_app)
 

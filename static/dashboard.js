@@ -393,11 +393,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     semesterSelect.addEventListener('change', () => { currentSemesterId = semesterSelect.value; refreshCurrentPage(); });
+    
+    // LOGOUT HANDLER UPDATED - Secure logout
     logoutBtn.addEventListener('click', async (e) => { 
         e.preventDefault();
-        await fetch(`${API_BASE_URL}/logout`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: localStorage.getItem('vtop_session_id')}) }); 
-        localStorage.removeItem('vtop_session_id'); window.location.href = '/login'; 
+        await fetch(`${API_BASE_URL}/logout`, { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({session_id: localStorage.getItem('vtop_session_id')}) 
+        }); 
+        localStorage.removeItem('vtop_session_id'); 
+        // Note: Credentials cookie is deleted by the server response header
+        window.location.href = '/login'; 
     });
+    
     calendarContainer.addEventListener('click', (e) => {
         const navBtn = e.target.closest('.calendar-nav-btn');
         if (navBtn) fetchAndDisplay(CALENDAR_TARGET, calendarContainer, "Academic Calendar", { calDate: navBtn.dataset.date });
