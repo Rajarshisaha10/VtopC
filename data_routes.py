@@ -10,7 +10,7 @@ from auth import get_serializer
 from session_manager import session_storage
 from parsers.timetable_parser import parse_course_data
 from parsers.attendance_parser import parse_attendance_summary, parse_attendance_detail
-from parsers.calendar_parser import parse_academic_calendar
+from parsers.calendar_parser import parse_academic_calendar, parse_class_groups
 from parsers.marks_parser import parse_marks
 from parsers.exam_schedule_parser import parse_exam_schedule
 from parsers.profile_parser import parse_profile
@@ -25,6 +25,7 @@ TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
 ATTENDANCE_TARGET = 'processViewStudentAttendance'
 ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
 CALENDAR_TARGET = 'academics/common/CalendarPreview'
+CALENDAR_INIT_TARGET = 'getDateForSemesterPreview'
 CALENDAR_VIEW_TARGET = 'processViewCalendar'
 MARKS_TARGET = 'examinations/doStudentMarkView'
 EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent'
@@ -101,13 +102,44 @@ def fetch_data():
             return jsonify({'status': 'success', 'html_content': html, 'raw_data': parsed_data})
             
         elif target == CALENDAR_TARGET:
+            # 1. Fetch available class groups to determine if we are Freshers or General
+            init_payload = {
+                'authorizedID': authorized_id,
+                '_csrf': csrf_token,
+                'semSubId': semester_sub_id,
+                'paramReturnId': 'getDateForSemesterPreview',
+                'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT")
+            }
+            
+            selected_group = 'ALL' # Default to General Semester
+            try:
+                init_res = session.post(f"{base_url}/{CALENDAR_INIT_TARGET}", data=init_payload, headers=headers, verify=False)
+                available_groups = parse_class_groups(init_res.text)
+                
+                # Priority: Fresher (ALL03) > General (ALL)
+                if 'ALL03' in available_groups:
+                    selected_group = 'ALL03'
+                elif 'ALL' in available_groups:
+                    selected_group = 'ALL'
+            except Exception:
+                pass # Stick to default 'ALL' if init fails
+
             if not cal_date:
                 now = datetime.datetime.now()
                 cal_date = now.strftime("01-%b-%Y").upper()
             
-            payload = { 'authorizedID': authorized_id, '_csrf': csrf_token, 'calDate': cal_date, 'semSubId': semester_sub_id, 'classGroupId': 'ALL03', 'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT") }
+            # 2. Fetch the actual calendar data using the selected group
+            payload = { 
+                'authorizedID': authorized_id, 
+                '_csrf': csrf_token, 
+                'calDate': cal_date, 
+                'semSubId': semester_sub_id, 
+                'classGroupId': selected_group,
+                'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT") 
+            }
             res = session.post(f"{base_url}/{CALENDAR_VIEW_TARGET}", data=payload, headers=headers, verify=False)
             parsed_data = parse_academic_calendar(res.text)
+
             # [Exam merging logic omitted for brevity, assumed same as before]
             try:
                 cal_dt_obj = datetime.datetime.strptime(cal_date.title(), "%d-%b-%Y")

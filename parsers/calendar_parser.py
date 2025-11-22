@@ -102,3 +102,25 @@ def parse_academic_calendar(html_content):
         'month_title': month_title,
         'days': calendar_data
     }
+
+def parse_class_groups(html_content):
+    """
+    Parses the class group dropdown from the calendar preview page response.
+    Returns a set of available value codes (e.g., {'ALL', 'ALL03', ...}).
+    """
+    if not html_content:
+        return set()
+    
+    soup = BeautifulSoup(html_content, 'html.parser')
+    select = soup.find('select', {'name': 'classGroupId'})
+    
+    if not select:
+        return set()
+        
+    options = set()
+    for opt in select.find_all('option'):
+        val = opt.get('value')
+        if val:
+            options.add(val)
+            
+    return options
