@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyCampus Hub - Student Portal</title>
+    <title>VtopC</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -230,5 +234,12 @@
     </script>
     <script src="{{ url_for('static', filename='calculator.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='dashboard.js') }}"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker
+            .register('/static/sw.js')
+            .then(() => { console.log('Service Worker Registered'); });
+        }
+    </script>
 </body>
 </html>
