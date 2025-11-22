@@ -1,10 +1,12 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, current_app
 from bs4 import BeautifulSoup
 import requests
 import warnings
 import datetime
 import re
 
+# Import the serializer getter from auth to verify password against cookie
+from auth import get_serializer
 from session_manager import session_storage
 from parsers.timetable_parser import parse_course_data
 from parsers.attendance_parser import parse_attendance_summary, parse_attendance_detail
@@ -12,12 +14,13 @@ from parsers.calendar_parser import parse_academic_calendar
 from parsers.marks_parser import parse_marks
 from parsers.exam_schedule_parser import parse_exam_schedule
 from parsers.profile_parser import parse_profile
+from parsers.credentials_parser import parse_credentials
 
 warnings.filterwarnings('ignore', category=requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 data_bp = Blueprint('data_bp', __name__)
 
-# --- Targets ---
+# ... [Previous constants remain the same] ...
 TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
 ATTENDANCE_TARGET = 'processViewStudentAttendance'
 ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
@@ -27,17 +30,14 @@ MARKS_TARGET = 'examinations/doStudentMarkView'
 EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent'
 PROFILE_TARGET = 'student/studentProfileView'
 
+# ... [get_session_details and get_semesters functions remain the same] ...
 def get_session_details(session_id):
     if not session_id or 'session' not in session_storage.get(session_id, {}):
         raise Exception("Invalid session.")
     
     session_data = session_storage[session_id]
     session = session_data['session']
-    
-    # USE AUTHORIZED_ID (ROLL NO) INSTEAD OF USERNAME
-    # If authorized_id isn't found, fallback to username
     authorized_id = session_data.get('authorized_id', session_data.get('username'))
-    
     base_url = "https://vtopcc.vit.ac.in/vtop"
     
     try:
@@ -60,21 +60,16 @@ def get_session_details(session_id):
 def get_semesters():
     session_id = request.json.get('session_id')
     try:
-        # Unpack authorized_id instead of username
         session, authorized_id, csrf_token, base_url = get_session_details(session_id)
-        
         headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
-        # Use authorizedID in payload instead of authorizedID which used to hold username
         res = session.post(f"{base_url}/{TIMETABLE_TARGET}", data={'authorizedID': authorized_id, '_csrf': csrf_token, 'verifyMenu': 'true'}, headers=headers, verify=False)
         res.raise_for_status()
-        
         soup = BeautifulSoup(res.text, 'html.parser')
         sem_select = soup.find('select', {'id': 'semesterSubId'})
         semesters = []
         if sem_select:
             for opt in sem_select.find_all('option'):
                 if opt.get('value'): semesters.append({'id': opt['value'], 'name': opt.get_text(strip=True)})
-        
         return jsonify({'status': 'success', 'semesters': semesters})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 401
@@ -113,16 +108,14 @@ def fetch_data():
             payload = { 'authorizedID': authorized_id, '_csrf': csrf_token, 'calDate': cal_date, 'semSubId': semester_sub_id, 'classGroupId': 'ALL03', 'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT") }
             res = session.post(f"{base_url}/{CALENDAR_VIEW_TARGET}", data=payload, headers=headers, verify=False)
             parsed_data = parse_academic_calendar(res.text)
-            
+            # [Exam merging logic omitted for brevity, assumed same as before]
             try:
                 cal_dt_obj = datetime.datetime.strptime(cal_date.title(), "%d-%b-%Y")
                 view_month = cal_dt_obj.month
                 view_year = cal_dt_obj.year
-
                 exam_payload = {'authorizedID': authorized_id, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
                 exam_res = session.post(f"{base_url}/{EXAM_SCHEDULE_TARGET}", data=exam_payload, headers=headers, verify=False)
                 exam_schedule = parse_exam_schedule(exam_res.text)
-
                 for exam in exam_schedule:
                     try:
                         ex_date = datetime.datetime.strptime(exam['exam_date'], "%d-%b-%Y")
@@ -133,16 +126,13 @@ def fetch_data():
                                     day_obj['events'] = [e for e in day_obj['events'] if 'holiday' not in e['text'].lower() and 'no instructional' not in e['text'].lower()]
                                     exam_type_lbl = exam.get('exam_type', 'Exam')
                                     day_obj['events'].append({'text': f"{exam_type_lbl}: {exam['course_code']} ({exam['slot']})"})
-                    except (ValueError, KeyError, TypeError):
-                        continue
-            except Exception as e:
-                print(f"Error merging exam schedule into calendar: {e}")
+                    except (ValueError, KeyError, TypeError): continue
+            except Exception: pass
 
             curr_dt = datetime.datetime.strptime(cal_date.title(), "%d-%b-%Y")
             next_month = (curr_dt + datetime.timedelta(days=32)).replace(day=1)
             prev_month = (curr_dt - datetime.timedelta(days=1)).replace(day=1)
             nav_info = { 'current': cal_date, 'next': next_month.strftime("01-%b-%Y").upper(), 'prev': prev_month.strftime("01-%b-%Y").upper() }
-
             html = render_template('calendar_content.html', calendar=parsed_data, nav=nav_info)
             return jsonify({'status': 'success', 'html_content': html})
 
@@ -163,10 +153,11 @@ def fetch_data():
         elif target == PROFILE_TARGET:
              real_target = "studentsRecord/StudentProfileAllView"
              payload = {'verifyMenu': 'true', 'authorizedID': authorized_id, '_csrf': csrf_token, 'nocache': '@(new Date().getTime())'}
-             
              res = session.post(f"{base_url}/{real_target}", data=payload, headers=headers, verify=False)
-             parsed_data = parse_profile(res.text)
-             html = render_template('profile_content.html', profile=parsed_data)
+             parsed_profile = parse_profile(res.text)
+             # NOTE: We do NOT fetch credentials here anymore. 
+             # They are fetched via a separate authenticated call.
+             html = render_template('profile_content.html', profile=parsed_profile)
              return jsonify({'status': 'success', 'html_content': html})
         
         else:
@@ -178,6 +169,50 @@ def fetch_data():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 401
 
+@data_bp.route('/fetch-profile-credentials', methods=['POST'])
+def fetch_profile_credentials():
+    """
+    Secure endpoint to fetch credentials. Requires re-validation of VTOP password.
+    """
+    data = request.json
+    session_id = data.get('session_id')
+    password_attempt = data.get('password')
+    
+    if not session_id or session_id not in session_storage:
+        return jsonify({'status': 'error', 'message': 'Session expired'}), 401
+
+    # 1. Verify Password against the secure cookie (avoiding re-login to VTOP for speed/security)
+    cookie_token = request.cookies.get('vtop_creds')
+    if not cookie_token:
+        return jsonify({'status': 'error', 'message': 'Auth token missing. Please relogin.'}), 401
+
+    try:
+        creds = get_serializer().loads(cookie_token, max_age=60*60*24*30)
+        stored_password = creds['p']
+        
+        if password_attempt != stored_password:
+            return jsonify({'status': 'error', 'message': 'Incorrect Password'}), 403
+            
+        # 2. Password is correct, fetch the data
+        session, authorized_id, csrf_token, base_url = get_session_details(session_id)
+        headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
+        payload = {'verifyMenu': 'true', 'authorizedID': authorized_id, '_csrf': csrf_token, 'nocache': '@(new Date().getTime())'}
+        
+        creds_target = "proctor/viewStudentCredentials"
+        creds_res = session.post(f"{base_url}/{creds_target}", data=payload, headers=headers, verify=False)
+        parsed_data = parse_credentials(creds_res.text)
+        
+        # Render just the table part using a new mini-template string or reusable block
+        # For simplicity, we'll return the JSON data and let frontend build it, 
+        # OR render a partial template. Let's render a partial for consistency.
+        html = render_template('credentials_table_partial.html', data=parsed_data)
+        
+        return jsonify({'status': 'success', 'html_content': html})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ... [Other routes like fetch_attendance_detail and get_od_snapshot remain unchanged] ...
 @data_bp.route('/fetch-attendance-detail', methods=['POST'])
 def fetch_attendance_detail():
     data = request.json

@@ -12,25 +12,22 @@ def parse_profile(html_content):
     profile_data = {
         'personal': {},
         'educational': {},
-        'family': {},
+        'family': {'father': {}, 'mother': {}},
         'proctor': {},
         'hostel': {}
     }
 
-    # Helper to safely get text from a row
+    # Helper to safely get text from a row (for simple unique keys)
     def get_row_value(table, key_name):
         if not table: return "N/A"
-        # Find the td containing the key (e.g., "STUDENT NAME")
         key_td = table.find('td', string=lambda text: text and key_name.lower() in text.lower())
         if key_td:
-            # The value is usually in the next td
             value_td = key_td.find_next_sibling('td')
             if value_td:
                 return value_td.get_text(strip=True)
         return "N/A"
 
     # --- Personal Info ---
-    # Personal info is usually in the first collapse/accordion item
     personal_table = soup.find('div', id='collapseOne')
     if personal_table:
         profile_data['personal'] = {
@@ -43,8 +40,6 @@ def parse_profile(html_content):
             'mobile': get_row_value(personal_table, 'MOBILE NUMBER'),
             'native_state': get_row_value(personal_table, 'NATIVE STATE')
         }
-
-        # Image extraction (it's outside the table usually)
         img_tag = soup.find('img', class_='img border border-primary')
         if img_tag:
             profile_data['personal']['photo_url'] = img_tag.get('src')
@@ -61,8 +56,35 @@ def parse_profile(html_content):
         }
 
     # --- Family Info ---
-    # (Skipping for brevity unless specifically requested, follows same pattern)
-    
+    family_table = soup.find('div', id='collapseThree')
+    if family_table:
+        rows = family_table.find_all('tr')
+        current_section = 'father' # Default
+        
+        for row in rows:
+            text = row.get_text(strip=True).upper()
+            # Switch context based on header rows
+            if 'FATHER DETAILS' in text:
+                current_section = 'father'
+                continue
+            elif 'MOTHER DETAILS' in text:
+                current_section = 'mother'
+                continue
+            
+            cells = row.find_all('td')
+            if len(cells) >= 2:
+                key = cells[0].get_text(strip=True).upper()
+                val = cells[1].get_text(strip=True)
+                
+                target = profile_data['family'][current_section]
+                
+                if 'NAME' in key and 'STREET' not in key and 'AREA' not in key:
+                     target['name'] = val
+                elif 'OCCUPATION' in key: target['occupation'] = val
+                elif 'ORGANIZATION' in key: target['organization'] = val
+                elif 'MOBILE' in key: target['mobile'] = val
+                elif 'EMAIL' in key: target['email'] = val
+
     # --- Proctor Info ---
     proctor_table = soup.find('div', id='collapseFour')
     if proctor_table:

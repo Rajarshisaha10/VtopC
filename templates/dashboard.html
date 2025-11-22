@@ -227,6 +227,6 @@
         document.getElementById('current-date-display').textContent = new Date().toLocaleDateString('en-US', dateOptions);
     </script>
     <script src="{{ url_for('static', filename='calculator.js') }}"></script>
-    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 </html>
