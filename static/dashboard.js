@@ -78,7 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeNav && !['academics', 'examinations', 'extra'].includes(activeNav.dataset.section)) {
             const sectionId = activeNav.dataset.section;
             if (sectionId === 'dashboard') {
-                // This will load from cache if available, skipping network
                 Data.fetchTimetableAndCourses(null, null, elements.todaySchedule)
                     .then(() => Data.fetchAndCalculateAttendanceSnapshot())
                     .then(() => Data.fetchAndDisplayODSnapshot());
@@ -91,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Event Listeners
+    // --- Event Listeners ---
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.view-attendance-detail');
         if (btn) {
@@ -143,11 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             UI.showPageSection(parentId, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
             UI.showSubsection(parentId, subsectionId, elements.navLinkChildren);
             
-            // If clicking Timetable or Courses, this function will now use the cache first
-            if (subsectionId === 'academics-courses') Data.fetchTimetableAndCourses(elements.courses, null, null);
-            else if (subsectionId === 'academics-timetable') Data.fetchTimetableAndCourses(null, elements.timetable, null);
-            else if (subsectionId === 'academics-attendance') Data.fetchAndCalculateAttendanceSnapshot().then(() => Data.fetchAndDisplay(TARGETS.ATTENDANCE, elements.attendance, "Attendance"));
-            else if (subsectionId === 'extra-calculator') {
+            if (subsectionId === 'extra-calculator') {
                  elements.calculator.innerHTML = '<div class="p-8 text-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-2"></i><p class="text-gray-500">Opening calculator...</p></div>';
                  if (typeof lucide !== 'undefined') lucide.createIcons();
                  
@@ -155,6 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
                      if(window.initAttendanceCalculator) window.initAttendanceCalculator(elements.calculator, state.cachedAttendance, state.cachedTimetable);
                  });
             }
+            else if (subsectionId === 'academics-courses') Data.fetchTimetableAndCourses(elements.courses, null, null);
+            else if (subsectionId === 'academics-timetable') Data.fetchTimetableAndCourses(null, elements.timetable, null);
+            else if (subsectionId === 'academics-attendance') Data.fetchAndCalculateAttendanceSnapshot().then(() => Data.fetchAndDisplay(TARGETS.ATTENDANCE, elements.attendance, "Attendance"));
             else if (subsectionId === 'academics-calendar') Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar");
             else if (subsectionId === 'academics-curriculum') Data.fetchAndDisplay(TARGETS.CURRICULUM, elements.curriculum, "My Curriculum");
             else if (subsectionId === 'academics-projects') Data.fetchAndDisplay(TARGETS.PROJECTS, elements.projects, "Projects");
@@ -183,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const val = elements.semesterSelect.value;
             state.setSemesterId(val);
             localStorage.setItem('vtop_semester_id', val); 
-            refreshCurrentPage(); // This will fetch new data because ID changed
+            refreshCurrentPage(); 
         });
     }
     
@@ -255,8 +253,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function startOfflineMode() {
         console.log("Starting offline/fallback mode.");
         const cachedName = localStorage.getItem('vtop_username_cache');
+        const cachedRegNo = localStorage.getItem('vtop_regno_cache');
+        
         if (elements.sidebarUsername) elements.sidebarUsername.textContent = cachedName || 'User';
-        if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = 'Offline Mode';
+        // Use cached status or default to 'Offline' (avoiding "No Internet Connection")
+        if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = cachedRegNo || 'Offline';
         
         const savedSemId = localStorage.getItem('vtop_semester_id');
         if (savedSemId) {
@@ -280,9 +281,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error("Session check failed");
             const data = await response.json();
             if (data.status === 'success') {
-                if (elements.sidebarUsername) elements.sidebarUsername.textContent = data.username || 'User';
-                if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = data.username || 'Session Active';
-                localStorage.setItem('vtop_username_cache', data.username || 'User');
+                // Update sidebar
+                const userName = data.username || 'User';
+                const regStatus = 'Session Active';
+
+                if (elements.sidebarUsername) elements.sidebarUsername.textContent = userName;
+                if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = regStatus;
+                
+                // Cache these for offline use
+                localStorage.setItem('vtop_username_cache', userName);
+                localStorage.setItem('vtop_regno_cache', regStatus);
+                
                 populateSemesterDropdown(); 
             } else { 
                 // Explicit failure from server = logout
