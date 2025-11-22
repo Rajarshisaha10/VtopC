@@ -6,7 +6,6 @@ import * as Data from './modules/data.js';
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded.");
 
-    // --- DOM Elements ---
     const elements = {
         menuToggle: document.getElementById('menu-toggle'),
         sidebar: document.getElementById('sidebar'),
@@ -54,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.calculator
     ];
 
-    // --- Helper Functions ---
     function closeSidebar() {
         if(window.innerWidth < 768) {
             elements.sidebar.classList.add('-translate-x-full');
@@ -80,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeNav && !['academics', 'examinations', 'extra'].includes(activeNav.dataset.section)) {
             const sectionId = activeNav.dataset.section;
             if (sectionId === 'dashboard') {
-                // These functions now have internal caching and checks
+                // This will load from cache if available, skipping network
                 Data.fetchTimetableAndCourses(null, null, elements.todaySchedule)
                     .then(() => Data.fetchAndCalculateAttendanceSnapshot())
                     .then(() => Data.fetchAndDisplayODSnapshot());
@@ -93,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Event Listeners ---
+    // Event Listeners
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.view-attendance-detail');
         if (btn) {
@@ -125,10 +123,12 @@ document.addEventListener('DOMContentLoaded', () => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             UI.showPageSection(link.dataset.section, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
+            
             const section = link.dataset.section;
             if (section === 'enrollment') Data.fetchAndDisplay(TARGETS.ENROLLMENT, elements.enrollment, "Course Enrollment");
             else if (section === 'hostel') Data.fetchAndDisplay(TARGETS.HOSTEL, elements.hostel, "Hostel");
             else if (section === 'profile') Data.fetchAndDisplay(TARGETS.PROFILE, elements.profile, "Profile");
+            
             closeSidebar();
             elements.contentContainer.scrollTop = 0;
         });
@@ -139,21 +139,22 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const parentId = link.dataset.parent;
             const subsectionId = link.dataset.subsection;
+            
             UI.showPageSection(parentId, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
             UI.showSubsection(parentId, subsectionId, elements.navLinkChildren);
             
-            if (subsectionId === 'extra-calculator') {
-                 elements.calculator.innerHTML = '<div class="p-8 text-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-2"></i><p class="text-gray-500">Preparing calculator...</p></div>';
+            // If clicking Timetable or Courses, this function will now use the cache first
+            if (subsectionId === 'academics-courses') Data.fetchTimetableAndCourses(elements.courses, null, null);
+            else if (subsectionId === 'academics-timetable') Data.fetchTimetableAndCourses(null, elements.timetable, null);
+            else if (subsectionId === 'academics-attendance') Data.fetchAndCalculateAttendanceSnapshot().then(() => Data.fetchAndDisplay(TARGETS.ATTENDANCE, elements.attendance, "Attendance"));
+            else if (subsectionId === 'extra-calculator') {
+                 elements.calculator.innerHTML = '<div class="p-8 text-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-2"></i><p class="text-gray-500">Opening calculator...</p></div>';
                  if (typeof lucide !== 'undefined') lucide.createIcons();
                  
-                 // Calculator needs cached data. If missing, try to fetch (will fail if offline, then calculator won't init)
                  Promise.all([Data.fetchAttendanceForCache(), Data.fetchTimetableForCache()]).then(() => { 
                      if(window.initAttendanceCalculator) window.initAttendanceCalculator(elements.calculator, state.cachedAttendance, state.cachedTimetable);
                  });
             }
-            else if (subsectionId === 'academics-courses') Data.fetchTimetableAndCourses(elements.courses, null, null);
-            else if (subsectionId === 'academics-timetable') Data.fetchTimetableAndCourses(null, elements.timetable, null);
-            else if (subsectionId === 'academics-attendance') Data.fetchAndDisplay(TARGETS.ATTENDANCE, elements.attendance, "Attendance");
             else if (subsectionId === 'academics-calendar') Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar");
             else if (subsectionId === 'academics-curriculum') Data.fetchAndDisplay(TARGETS.CURRICULUM, elements.curriculum, "My Curriculum");
             else if (subsectionId === 'academics-projects') Data.fetchAndDisplay(TARGETS.PROJECTS, elements.projects, "Projects");
@@ -165,11 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    if(elements.menuToggle) {
-        elements.menuToggle.addEventListener('click', () => {
-            if (elements.sidebar.classList.contains('-translate-x-full')) openSidebar(); else closeSidebar();
-        });
-    }
+    if(elements.menuToggle) elements.menuToggle.addEventListener('click', () => { if (elements.sidebar.classList.contains('-translate-x-full')) openSidebar(); else closeSidebar(); });
     if(elements.sidebarOverlay) elements.sidebarOverlay.addEventListener('click', closeSidebar);
     
     const themeToggle = document.getElementById('theme-toggle');
@@ -186,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const val = elements.semesterSelect.value;
             state.setSemesterId(val);
             localStorage.setItem('vtop_semester_id', val); 
-            refreshCurrentPage(); 
+            refreshCurrentPage(); // This will fetch new data because ID changed
         });
     }
     
@@ -194,9 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.logoutBtn.addEventListener('click', async (e) => { 
             e.preventDefault();
             if(navigator.onLine) {
-                try {
-                    await fetch(`${API_BASE_URL}/logout`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: localStorage.getItem('vtop_session_id')}) });
-                } catch(e) {}
+                try { await fetch(`${API_BASE_URL}/logout`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: localStorage.getItem('vtop_session_id')}) }); } catch(e) {}
             }
             localStorage.removeItem('vtop_session_id'); 
             window.location.href = '/login'; 
@@ -209,62 +204,94 @@ document.addEventListener('DOMContentLoaded', () => {
             if (navBtn) Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar", { calDate: navBtn.dataset.date });
         });
     }
-    
+
     window.unlockCredentials = async function() {
-        // Same credential unlock logic...
+        // (Keep existing unlock logic)
+        const passwordInput = document.getElementById('creds-password-input');
+        const unlockBtn = document.getElementById('creds-unlock-btn');
+        const errorMsg = document.getElementById('creds-error');
+        const lockedView = document.getElementById('creds-locked');
+        const contentView = document.getElementById('creds-content');
+        
+        const password = passwordInput.value;
+        if (!password) { errorMsg.textContent = "Please enter your password."; errorMsg.classList.remove('hidden'); return; }
+
+        const originalBtnText = unlockBtn.innerHTML;
+        unlockBtn.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4 mr-2"></i> Verifying...';
+        unlockBtn.disabled = true;
+        errorMsg.classList.add('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        try {
+            const response = await fetch(`${window.location.origin}/fetch-profile-credentials`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), password: password })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                contentView.innerHTML = data.html_content;
+                lockedView.style.opacity = '0';
+                setTimeout(() => { lockedView.classList.add('hidden'); contentView.classList.remove('hidden'); }, 300);
+            } else {
+                errorMsg.textContent = data.message || "Verification failed.";
+                errorMsg.classList.remove('hidden');
+                unlockBtn.innerHTML = originalBtnText;
+                unlockBtn.disabled = false;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        } catch (error) {
+            console.error(error);
+            errorMsg.textContent = "Network error. Please try again.";
+            errorMsg.classList.remove('hidden');
+            unlockBtn.innerHTML = originalBtnText;
+            unlockBtn.disabled = false;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
     };
 
-    // --- Initialization Functions ---
+    // --- Init ---
     
-    function activateOfflineMode() {
-        console.log("Activating Offline Mode");
+    function startOfflineMode() {
+        console.log("Starting offline/fallback mode.");
         const cachedName = localStorage.getItem('vtop_username_cache');
-        if (elements.sidebarUsername) elements.sidebarUsername.textContent = cachedName || 'Offline Mode';
-        if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = 'No Internet Connection';
+        if (elements.sidebarUsername) elements.sidebarUsername.textContent = cachedName || 'User';
+        if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = 'Offline Mode';
         
         const savedSemId = localStorage.getItem('vtop_semester_id');
         if (savedSemId) {
             state.setSemesterId(savedSemId);
-            // Fallback for dropdown to prevent "Loading..."
             elements.semesterSelect.innerHTML = `<option value="${savedSemId}" selected>Saved Semester</option>`;
         } else {
-             elements.semesterSelect.innerHTML = `<option disabled>No saved semester</option>`;
+            elements.semesterSelect.innerHTML = `<option disabled>No semester saved</option>`;
         }
-        
         refreshCurrentPage();
     }
 
     async function checkSession() {
         const savedSessionId = localStorage.getItem('vtop_session_id');
         if (!savedSessionId) { window.location.href = '/login'; return; }
-
-        // If physically offline, skip network check entirely
-        if (!navigator.onLine) {
-            activateOfflineMode();
-            return;
-        }
         
+        // Immediate offline check
+        if (!navigator.onLine) { startOfflineMode(); return; }
+
         try {
             const response = await fetch(`${API_BASE_URL}/check-session`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: savedSessionId }) });
-            
-            if (!response.ok) throw new Error("Server returned error");
-            
+            if (!response.ok) throw new Error("Session check failed");
             const data = await response.json();
             if (data.status === 'success') {
                 if (elements.sidebarUsername) elements.sidebarUsername.textContent = data.username || 'User';
                 if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = data.username || 'Session Active';
-                
                 localStorage.setItem('vtop_username_cache', data.username || 'User');
                 populateSemesterDropdown(); 
             } else { 
-                // Only redirect if explicit failure (Session Invalid) AND we are confident we are online
+                // Explicit failure from server = logout
                 localStorage.removeItem('vtop_session_id'); 
                 window.location.href = '/login'; 
             }
         } catch (error) { 
-            // Network failure (server down, timeout, etc)
-            console.log("Session check failed, assuming offline/server down.");
-            activateOfflineMode();
+            // Network/Fetch error = Offline Mode
+            startOfflineMode();
         }
     }
     
@@ -276,10 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.semesterSelect.innerHTML = ''; 
                 const savedSemId = localStorage.getItem('vtop_semester_id');
                 let selectedId = data.semesters[0].id; 
-                
-                if (savedSemId && data.semesters.some(s => s.id === savedSemId)) {
-                    selectedId = savedSemId;
-                }
+                if (savedSemId && data.semesters.some(s => s.id === savedSemId)) selectedId = savedSemId;
                 
                 data.semesters.forEach(s => { 
                     const opt = document.createElement('option'); 
@@ -288,14 +312,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (s.id === selectedId) opt.selected = true;
                     elements.semesterSelect.appendChild(opt); 
                 });
-
                 state.setSemesterId(selectedId);
-                localStorage.setItem('vtop_semester_id', selectedId); 
+                localStorage.setItem('vtop_semester_id', selectedId);
                 refreshCurrentPage();
             }
         } catch (error) { 
-            // Fallback if semester fetch fails
-            console.error(error);
+            // Fallback if dropdown fetch fails
+            const savedSemId = localStorage.getItem('vtop_semester_id');
+            if(savedSemId) {
+                 state.setSemesterId(savedSemId);
+                 elements.semesterSelect.innerHTML = `<option value="${savedSemId}" selected>Saved Semester</option>`;
+                 refreshCurrentPage();
+            }
         }
     }
 
