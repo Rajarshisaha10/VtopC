@@ -7,9 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const loadingContainer = document.getElementById('loadingContainer');
     const loginContainer = document.getElementById('loginContainer');
-    const loadingText = document.querySelector('#loadingContainer p'); // To update text
+    const loadingText = document.querySelector('#loadingContainer p'); 
     const loginForm = document.getElementById('loginForm');
-    const captchaGroup = document.getElementById('captchaGroup');
+    const captchaGroup = document.getElementById('captchaGroup'); // Will remain hidden
     const captchaImageContainer = document.getElementById('captchaImageContainer');
     const sessionIdInput = document.getElementById('sessionId');
     const statusMessage = document.getElementById('statusMessage');
@@ -22,8 +22,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- UI HELPER FUNCTIONS ---
     function setStatus(message, isError = false) {
-        statusMessage.textContent = message;
-        statusMessage.className = `mt-6 text-center text-sm ${isError ? 'text-red-600' : 'text-green-600'}`;
+        // Only show status if it's an error (like invalid password) or a critical loading state
+        if (isError) {
+            // Only check for specific keywords if we want to mask the message
+            let displayMessage = message;
+            
+            // If the server message is about captcha, we generally don't want to show it to the user 
+            // because it's handled automatically. However, if it's a hard failure (retries exhausted),
+            // we might show a generic error.
+            // BUT, per your request, we keep "Invalid Username/Password" errors visible.
+            
+            statusMessage.textContent = displayMessage;
+            statusMessage.className = `mt-6 text-center text-sm text-red-600`;
+        } else {
+            statusMessage.textContent = ""; 
+        }
     }
 
     function setButtonLoading(isLoading) {
@@ -35,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showLoginScreen() {
         loadingContainer.classList.add('hidden');
         loginContainer.classList.remove('hidden');
+        captchaGroup.classList.add('hidden'); 
     }
     
     function updateLoadingText(text) {
@@ -43,19 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- CORE LOGIC ---
     
-    /**
-     * Fetches a new CAPTCHA and session from the server.
-     * @param {boolean} isRetry - If true, auto-submits the form after solving (for manual login retries).
-     * @param {boolean} isAutoLoginCheck - If true, attempts to use stored cookies to login before showing form.
-     */
     async function preFetchCaptcha(isRetry = false, isAutoLoginCheck = false) {
-        captchaGroup.classList.remove('hidden');
-        captchaImageContainer.innerHTML = '<i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>';
-        
-        if (isRetry && !isAutoLoginCheck) {
-             setStatus('Fetching new CAPTCHA...', false);
-        }
-        
         try {
             const response = await fetch(`${API_BASE_URL}/start-login`, { method: 'POST' });
             if (!response.ok) throw new Error(`Server error: ${response.status}`);
@@ -65,30 +67,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionIdInput.value = data.session_id;
                 captchaImageContainer.innerHTML = `<img src="${data.captcha_image_data}" alt="CAPTCHA"/>`;
                 
-                if (!isAutoLoginCheck) setStatus('Solving CAPTCHA...', false);
-                
                 try {
                     const solvedText = await solveCaptchaClient(data.captcha_image_data);
                     captchaInput.value = solvedText;
+                    console.log("Captcha solved in background:", solvedText);
                     
                     if (isAutoLoginCheck && data.has_saved_creds) {
-                        // --- AUTO LOGIN FLOW ---
-                        // Keep showing the loading screen, update text
                         updateLoadingText("Verifying saved credentials...");
                         await handleAutoLogin(solvedText);
                     } else {
-                        // --- STANDARD FLOW ---
-                        if (isAutoLoginCheck) {
-                            // We were checking for auto-login, but no creds found. Show form now.
-                            showLoginScreen();
-                        }
+                        if (isAutoLoginCheck) showLoginScreen();
                         
                         if (isRetry) {
-                            setStatus('New CAPTCHA solved. Auto-retrying...', false);
                             handleLoginAttempt(); 
                         } else {
-                            setStatus('New CAPTCHA solved. Please enter credentials.', false);
-                            // Focus logic
                             if(!document.getElementById('username').value) {
                                 document.getElementById('username').focus();
                             } else {
@@ -100,8 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (solveError) {
                     console.error('CAPTCHA solve error:', solveError);
                     if (isAutoLoginCheck) showLoginScreen();
-                    setStatus('Failed to auto-solve. Please enter manually.', true);
-                    captchaInput.focus();
+                    if (!isRetry) preFetchCaptcha(true, false);
                 }
 
             } else {
@@ -109,18 +100,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             if (isAutoLoginCheck) showLoginScreen();
-            setStatus(error.message, true);
-            captchaImageContainer.innerHTML = '<p class="text-xs text-red-500">Could not load CAPTCHA</p>';
+            console.error(error);
+            setStatus("Network error initializing session.", true);
         }
     }
 
     async function checkSession() {
         const savedSessionId = localStorage.getItem('vtop_session_id');
         
-        // If we don't have a session ID, start the login flow (which includes auto-login check)
         if (!savedSessionId) {
             updateLoadingText("Initializing secure session...");
-            preFetchCaptcha(false, true); // Start Auto-Login Check
+            preFetchCaptcha(false, true); 
             return;
         }
 
@@ -139,12 +129,16 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 localStorage.removeItem('vtop_session_id');
                 updateLoadingText("Session expired. Re-initializing...");
-                preFetchCaptcha(false, true); // Start Auto-Login Check
+                preFetchCaptcha(false, true); 
             }
         } catch (error) {
+            if (!navigator.onLine) {
+                 window.location.href = '/'; 
+                 return;
+            }
             localStorage.removeItem('vtop_session_id');
             updateLoadingText("Connection error. Retrying...");
-            preFetchCaptcha(false, true); // Start Auto-Login Check
+            preFetchCaptcha(false, true); 
         }
     }
     
@@ -164,12 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateLoadingText("Success! Entering dashboard...");
                 localStorage.setItem('vtop_session_id', data.session_id);
                 window.location.href = '/';
+            } else if (data.status === 'invalid_captcha') {
+                 console.log("Auto-login captcha failed, retrying...");
+                 preFetchCaptcha(true, true);
             } else {
-                // Auto login failed (bad creds or captcha).
-                // Show form and get a FRESH captcha because the previous one is now invalid/used.
                 showLoginScreen();
-                setStatus(data.message + " Please log in manually.", true);
-                preFetchCaptcha(false, false); // Fetch new captcha for manual entry
+                // Just show the error message from server directly (e.g., "Invalid User/Pass")
+                setStatus(data.message, true); 
+                preFetchCaptcha(false, false); 
             }
         } catch (e) {
             showLoginScreen();
@@ -180,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleLoginAttempt() {
         setButtonLoading(true);
-        setStatus('Attempting login...', false);
+        statusMessage.textContent = "";
         
         const payload = { 
             session_id: sessionIdInput.value,
@@ -199,18 +195,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.status === 'success') {
-                setStatus('Success! Redirecting...', false);
                 localStorage.setItem('vtop_session_id', data.session_id);
                 window.location.href = '/';
             
             } else if (data.status === 'invalid_captcha') {
-                setStatus(data.message + " Auto-retrying...", true);
+                console.log("Manual login captcha failed. Retrying silently...");
+                // Don't show any status to user, just retry
                 preFetchCaptcha(true); 
             
             } else {
+                // This block handles Invalid Username/Password, Locked Account etc.
                 setStatus(data.message, true); 
                 setButtonLoading(false); 
-                preFetchCaptcha(false); // Get new captcha for next try
+                preFetchCaptcha(false); 
             }
 
         } catch (error) {
@@ -234,10 +231,5 @@ document.addEventListener('DOMContentLoaded', () => {
         icon.classList.toggle('fa-eye-slash');
     });
 
-    captchaInput.addEventListener('input', () => {
-        captchaInput.value = captchaInput.value.toUpperCase();
-    });
-
-    // Initial check on page load
     checkSession();
 });

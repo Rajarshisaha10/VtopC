@@ -54,7 +54,7 @@ def perform_vtop_login(api_session, csrf_token, username, password, captcha_text
             return True, authorized_id, 'success'
         else:
             # Login Failed
-            error_message = "Invalid credentials or CAPTCHA."
+            error_message = "Invalid credentials."
             status_code = 'invalid_credentials'
             error_tag = soup.select_one("span.text-danger strong")
             if error_tag:
