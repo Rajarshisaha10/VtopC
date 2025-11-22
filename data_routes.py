@@ -11,6 +11,7 @@ from parsers.attendance_parser import parse_attendance_summary, parse_attendance
 from parsers.calendar_parser import parse_academic_calendar
 from parsers.marks_parser import parse_marks
 from parsers.exam_schedule_parser import parse_exam_schedule
+from parsers.profile_parser import parse_profile
 
 warnings.filterwarnings('ignore', category=requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
@@ -24,6 +25,7 @@ CALENDAR_TARGET = 'academics/common/CalendarPreview'
 CALENDAR_VIEW_TARGET = 'processViewCalendar'
 MARKS_TARGET = 'examinations/doStudentMarkView'
 EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent'
+PROFILE_TARGET = 'student/studentProfileView'
 
 def get_session_details(session_id):
     if not session_id or 'session' not in session_storage.get(session_id, {}):
@@ -157,6 +159,15 @@ def fetch_data():
             parsed_data = parse_exam_schedule(res.text)
             html = render_template('exam_schedule_content.html', exams=parsed_data)
             return jsonify({'status': 'success', 'html_content': html})
+
+        elif target == PROFILE_TARGET:
+             real_target = "studentsRecord/StudentProfileAllView"
+             payload = {'verifyMenu': 'true', 'authorizedID': authorized_id, '_csrf': csrf_token, 'nocache': '@(new Date().getTime())'}
+             
+             res = session.post(f"{base_url}/{real_target}", data=payload, headers=headers, verify=False)
+             parsed_data = parse_profile(res.text)
+             html = render_template('profile_content.html', profile=parsed_data)
+             return jsonify({'status': 'success', 'html_content': html})
         
         else:
             payload = {'authorizedID': authorized_id, '_csrf': csrf_token, 'verifyMenu': 'true'}
