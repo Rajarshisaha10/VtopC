@@ -68,12 +68,21 @@ export async function fetchAndCalculateAttendanceSnapshot() {
 
 export async function fetchTimetableAndCourses(coursesContainer, timetableContainer, todayScheduleContainer) {
     if (!state.currentSemesterId) return;
+    
+    const loadingHTML = `<div class="p-8 text-center text-gray-500 flex flex-col items-center justify-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Loading data...</p></div>`;
+    
+    if (coursesContainer) coursesContainer.innerHTML = loadingHTML;
+    if (timetableContainer) timetableContainer.innerHTML = loadingHTML;
+    if (todayScheduleContainer) todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 italic flex items-center"><i data-lucide="loader" class="animate-spin h-4 w-4 mr-2"></i> Loading schedule...</p>';
+    
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
     try {
         const response = await fetch(`${API_BASE_URL}/fetch-data`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), target: TARGETS.TIMETABLE, semesterSubId: state.currentSemesterId }) });
         const data = await response.json();
         if (data.status === 'success') {
             state.setTimetable(data.raw_data.timetable);
-            // If the containers exist (we might be on dashboard only, so coursesContainer might be null)
+            
             if (coursesContainer || timetableContainer) {
                  const parser = new DOMParser();
                  const doc = parser.parseFromString(data.html_content, 'text/html');

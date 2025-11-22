@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const elements = {
         menuToggle: document.getElementById('menu-toggle'),
         sidebar: document.getElementById('sidebar'),
+        sidebarOverlay: document.getElementById('sidebar-overlay'),
         navLinks: document.querySelectorAll('.nav-link'),
         navLinkChildren: document.querySelectorAll('.nav-link-child'),
         pageSections: document.querySelectorAll('.page-section'),
@@ -55,7 +56,24 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.calculator
     ];
 
-    // --- Logic ---
+    // --- Helper Functions for Sidebar ---
+    function closeSidebar() {
+        if(window.innerWidth < 768) {
+            elements.sidebar.classList.add('-translate-x-full');
+            if(elements.sidebarOverlay) {
+                elements.sidebarOverlay.classList.remove('opacity-100');
+                setTimeout(() => elements.sidebarOverlay.classList.add('hidden'), 300);
+            }
+        }
+    }
+
+    function openSidebar() {
+        elements.sidebar.classList.remove('-translate-x-full');
+        if(elements.sidebarOverlay) {
+            elements.sidebarOverlay.classList.remove('hidden');
+            setTimeout(() => elements.sidebarOverlay.classList.add('opacity-100'), 10);
+        }
+    }
 
     function refreshCurrentPage() {
         UI.clearAllDataContainers(allDataContainers);
@@ -64,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeNav && !['academics', 'examinations', 'extra'].includes(activeNav.dataset.section)) {
             const sectionId = activeNav.dataset.section;
             if (sectionId === 'dashboard') {
-                // Fix: Ensure we don't pass null elements if they aren't on screen
                 Data.fetchTimetableAndCourses(null, null, elements.todaySchedule)
                     .then(() => Data.fetchAndCalculateAttendanceSnapshot())
                     .then(() => Data.fetchAndDisplayODSnapshot());
@@ -72,6 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (sectionId === 'hostel') Data.fetchAndDisplay(TARGETS.HOSTEL, elements.hostel, "Hostel");
             else if (sectionId === 'profile') Data.fetchAndDisplay(TARGETS.PROFILE, elements.profile, "Profile");
         } else {
+            // For sub-sections
             const activeSub = document.querySelector('.nav-link-child.active-subsection');
             if (activeSub) activeSub.click();
         }
@@ -121,13 +139,12 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             UI.showPageSection(link.dataset.section, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
             
-            // Handle Data Loading
             const section = link.dataset.section;
             if (section === 'enrollment') Data.fetchAndDisplay(TARGETS.ENROLLMENT, elements.enrollment, "Course Enrollment");
             else if (section === 'hostel') Data.fetchAndDisplay(TARGETS.HOSTEL, elements.hostel, "Hostel");
             else if (section === 'profile') Data.fetchAndDisplay(TARGETS.PROFILE, elements.profile, "Profile");
             
-            if (window.innerWidth < 768) elements.sidebar.classList.add('-translate-x-full');
+            closeSidebar();
             elements.contentContainer.scrollTop = 0;
         });
     });
@@ -153,6 +170,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(window.initAttendanceCalculator) window.initAttendanceCalculator(elements.calculator, state.cachedAttendance, state.cachedTimetable); 
                 }
             }
+            // --- FIXED: Added missing handlers for Courses and Timetable ---
+            else if (subsectionId === 'academics-courses') {
+                Data.fetchTimetableAndCourses(elements.courses, null, null);
+            }
+            else if (subsectionId === 'academics-timetable') {
+                Data.fetchTimetableAndCourses(null, elements.timetable, null);
+            }
+            // -------------------------------------------------------------
             else if (subsectionId === 'academics-attendance') Data.fetchAndDisplay(TARGETS.ATTENDANCE, elements.attendance, "Attendance");
             else if (subsectionId === 'academics-calendar') Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar");
             else if (subsectionId === 'academics-curriculum') Data.fetchAndDisplay(TARGETS.CURRICULUM, elements.curriculum, "My Curriculum");
@@ -160,14 +185,27 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (subsectionId === 'examinations-marks') Data.fetchAndDisplay(TARGETS.MARKS, elements.marks, "Marks");
             else if (subsectionId === 'examinations-schedule') Data.fetchAndDisplay(TARGETS.EXAM_SCHEDULE, elements.examSchedule, "Exam Schedule");
 
-            if (window.innerWidth < 768) elements.sidebar.classList.add('-translate-x-full');
+            closeSidebar();
             elements.contentContainer.scrollTop = 0;
         });
     });
     
-    // 6. General UI
-    if(elements.menuToggle) elements.menuToggle.addEventListener('click', () => elements.sidebar.classList.toggle('-translate-x-full'));
+    // 6. Sidebar Toggle & Overlay
+    if(elements.menuToggle) {
+        elements.menuToggle.addEventListener('click', () => {
+            if (elements.sidebar.classList.contains('-translate-x-full')) {
+                openSidebar();
+            } else {
+                closeSidebar();
+            }
+        });
+    }
     
+    if(elements.sidebarOverlay) {
+        elements.sidebarOverlay.addEventListener('click', closeSidebar);
+    }
+    
+    // 7. Other UI
     const themeToggle = document.getElementById('theme-toggle');
     if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
     if(themeToggle) {
@@ -179,7 +217,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if(elements.semesterSelect) {
         elements.semesterSelect.addEventListener('change', () => { 
-            state.setSemesterId(elements.semesterSelect.value); 
+            const val = elements.semesterSelect.value;
+            state.setSemesterId(val);
+            localStorage.setItem('vtop_semester_id', val); // Save Preference
             refreshCurrentPage(); 
         });
     }
@@ -193,6 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({session_id: localStorage.getItem('vtop_session_id')}) 
             }); 
             localStorage.removeItem('vtop_session_id'); 
+            // We do not remove vtop_semester_id here to persist user preference across logins
             window.location.href = '/login'; 
         });
     }
@@ -285,8 +326,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.status === 'success' && data.semesters.length > 0) {
                 elements.semesterSelect.innerHTML = ''; 
-                data.semesters.forEach(s => { const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.name; elements.semesterSelect.appendChild(opt); });
-                state.setSemesterId(data.semesters[0].id);
+                
+                // Logic to handle saved semester preference
+                const savedSemId = localStorage.getItem('vtop_semester_id');
+                let selectedId = data.semesters[0].id; // Default to first available
+                
+                // If saved ID exists in the new list, use it
+                if (savedSemId && data.semesters.some(s => s.id === savedSemId)) {
+                    selectedId = savedSemId;
+                }
+                
+                data.semesters.forEach(s => { 
+                    const opt = document.createElement('option'); 
+                    opt.value = s.id; 
+                    opt.textContent = s.name; 
+                    if (s.id === selectedId) opt.selected = true;
+                    elements.semesterSelect.appendChild(opt); 
+                });
+
+                state.setSemesterId(selectedId);
+                localStorage.setItem('vtop_semester_id', selectedId); // Ensure consistency
                 refreshCurrentPage();
             }
         } catch (error) { console.error(error); }
