@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const loadingContainer = document.getElementById('loadingContainer');
     const loginContainer = document.getElementById('loginContainer');
+    const loadingText = document.querySelector('#loadingContainer p'); // To update text
     const loginForm = document.getElementById('loginForm');
     const captchaGroup = document.getElementById('captchaGroup');
     const captchaImageContainer = document.getElementById('captchaImageContainer');
@@ -34,21 +35,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function showLoginScreen() {
         loadingContainer.classList.add('hidden');
         loginContainer.classList.remove('hidden');
-        // This is an initial load, not a retry
-        preFetchCaptcha(false); 
+    }
+    
+    function updateLoadingText(text) {
+        if (loadingText) loadingText.textContent = text;
     }
 
     // --- CORE LOGIC ---
     
     /**
      * Fetches a new CAPTCHA and session from the server.
-     * @param {boolean} isRetry - If true, automatically re-submits the login form after solving.
+     * @param {boolean} isRetry - If true, auto-submits the form after solving (for manual login retries).
+     * @param {boolean} isAutoLoginCheck - If true, attempts to use stored cookies to login before showing form.
      */
-    async function preFetchCaptcha(isRetry = false) {
+    async function preFetchCaptcha(isRetry = false, isAutoLoginCheck = false) {
         captchaGroup.classList.remove('hidden');
         captchaImageContainer.innerHTML = '<i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>';
         
-        if (isRetry) {
+        if (isRetry && !isAutoLoginCheck) {
              setStatus('Fetching new CAPTCHA...', false);
         }
         
@@ -61,33 +65,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionIdInput.value = data.session_id;
                 captchaImageContainer.innerHTML = `<img src="${data.captcha_image_data}" alt="CAPTCHA"/>`;
                 
-                setStatus('Solving CAPTCHA...', false);
+                if (!isAutoLoginCheck) setStatus('Solving CAPTCHA...', false);
+                
                 try {
                     const solvedText = await solveCaptchaClient(data.captcha_image_data);
                     captchaInput.value = solvedText;
                     
-                    if (isRetry) {
-                        setStatus('New CAPTCHA solved. Auto-retrying...', false);
-                        // Determine if we are retrying a manual login or an auto-login
-                        // For simplicity, if retry comes from manual failure, we retry manually.
-                        // If we have saved creds, we might want to retry auto-login, but let's stick to manual retry here to be safe.
-                        handleLoginAttempt(); 
-                    } else if (data.has_saved_creds) {
-                        // --- SECURE AUTO LOGIN ---
-                        // The cookie exists, so we just send the captcha.
-                        setStatus('Auto-logging in...', false);
-                        handleAutoLogin(solvedText);
+                    if (isAutoLoginCheck && data.has_saved_creds) {
+                        // --- AUTO LOGIN FLOW ---
+                        // Keep showing the loading screen, update text
+                        updateLoadingText("Verifying saved credentials...");
+                        await handleAutoLogin(solvedText);
                     } else {
-                        setStatus('New CAPTCHA solved. Please enter credentials.', false);
-                        if(!document.getElementById('username').value) {
-                            document.getElementById('username').focus();
+                        // --- STANDARD FLOW ---
+                        if (isAutoLoginCheck) {
+                            // We were checking for auto-login, but no creds found. Show form now.
+                            showLoginScreen();
+                        }
+                        
+                        if (isRetry) {
+                            setStatus('New CAPTCHA solved. Auto-retrying...', false);
+                            handleLoginAttempt(); 
                         } else {
-                            passwordInput.focus();
+                            setStatus('New CAPTCHA solved. Please enter credentials.', false);
+                            // Focus logic
+                            if(!document.getElementById('username').value) {
+                                document.getElementById('username').focus();
+                            } else {
+                                passwordInput.focus();
+                            }
                         }
                     }
                     
                 } catch (solveError) {
                     console.error('CAPTCHA solve error:', solveError);
+                    if (isAutoLoginCheck) showLoginScreen();
                     setStatus('Failed to auto-solve. Please enter manually.', true);
                     captchaInput.focus();
                 }
@@ -96,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.message || 'Failed to get CAPTCHA.');
             }
         } catch (error) {
+            if (isAutoLoginCheck) showLoginScreen();
             setStatus(error.message, true);
             captchaImageContainer.innerHTML = '<p class="text-xs text-red-500">Could not load CAPTCHA</p>';
         }
@@ -103,8 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function checkSession() {
         const savedSessionId = localStorage.getItem('vtop_session_id');
+        
+        // If we don't have a session ID, start the login flow (which includes auto-login check)
         if (!savedSessionId) {
-            showLoginScreen();
+            updateLoadingText("Initializing secure session...");
+            preFetchCaptcha(false, true); // Start Auto-Login Check
             return;
         }
 
@@ -122,16 +138,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = '/'; 
             } else {
                 localStorage.removeItem('vtop_session_id');
-                showLoginScreen();
+                updateLoadingText("Session expired. Re-initializing...");
+                preFetchCaptcha(false, true); // Start Auto-Login Check
             }
         } catch (error) {
             localStorage.removeItem('vtop_session_id');
-            showLoginScreen();
+            updateLoadingText("Connection error. Retrying...");
+            preFetchCaptcha(false, true); // Start Auto-Login Check
         }
     }
     
     async function handleAutoLogin(captchaText) {
-        setButtonLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/auto-login`, { 
                 method: 'POST', 
@@ -144,21 +161,20 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const data = await response.json();
             if (data.status === 'success') {
-                setStatus('Success! Redirecting...', false);
+                updateLoadingText("Success! Entering dashboard...");
                 localStorage.setItem('vtop_session_id', data.session_id);
                 window.location.href = '/';
-            } else if (data.status === 'invalid_captcha') {
-                setStatus(data.message + " Retrying...", true);
-                preFetchCaptcha(true); // Retry logic
             } else {
-                // Credentials might be wrong or other error
-                setStatus(data.message, true);
-                setButtonLoading(false);
-                // Cookie likely deleted by server, user must login manually
+                // Auto login failed (bad creds or captcha).
+                // Show form and get a FRESH captcha because the previous one is now invalid/used.
+                showLoginScreen();
+                setStatus(data.message + " Please log in manually.", true);
+                preFetchCaptcha(false, false); // Fetch new captcha for manual entry
             }
         } catch (e) {
-            setStatus("Auto-login failed: " + e.message, true);
-            setButtonLoading(false);
+            showLoginScreen();
+            setStatus("Auto-login failed. Please log in manually.", true);
+            preFetchCaptcha(false, false);
         }
     }
 
@@ -188,13 +204,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = '/';
             
             } else if (data.status === 'invalid_captcha') {
-                setStatus(data.message + " Auto-retrying with new CAPTCHA...", true);
+                setStatus(data.message + " Auto-retrying...", true);
                 preFetchCaptcha(true); 
             
             } else {
                 setStatus(data.message, true); 
                 setButtonLoading(false); 
-                preFetchCaptcha(false); 
+                preFetchCaptcha(false); // Get new captcha for next try
             }
 
         } catch (error) {
