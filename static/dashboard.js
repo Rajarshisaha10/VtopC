@@ -6,13 +6,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const MARKS_TARGET = 'examinations/doStudentMarkView';
     const EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent';
     const ATTENDANCE_TARGET = 'processViewStudentAttendance';
+    const ATTENDANCE_DETAIL_TARGET = 'fetch-attendance-detail'; // Internal route
     const CALENDAR_TARGET = 'academics/common/CalendarPreview';
     const CURRICULUM_TARGET = 'student/viewMyCurriculum'; 
     const PROJECTS_TARGET = 'student/studentProjectView'; 
     const ENROLLMENT_TARGET = 'courseManagement/studentCourseRegister'; 
     const HOSTEL_TARGET = 'hostels/student/leave/1';
     const PROFILE_TARGET = 'student/studentProfileView';
-    const GRADES_TARGET = 'examinations/examGradeView/StudentGradeView'; 
 
     // --- State ---
     let currentSemesterId = null;
@@ -46,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const attendanceContainer = document.getElementById('attendance-container');
     const marksContainer = document.getElementById('marks-container');
     const examScheduleContainer = document.getElementById('exam-schedule-container');
-    const gradesContainer = document.getElementById('grades-container');
     const curriculumContainer = document.getElementById('curriculum-container');
     const projectsContainer = document.getElementById('projects-container');
     const calendarContainer = document.getElementById('calendar-container');
@@ -62,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const allDataContainers = [
         todayScheduleContainer, timetableContainer, coursesContainer,
-        attendanceContainer, marksContainer, examScheduleContainer, gradesContainer, curriculumContainer,
+        attendanceContainer, marksContainer, examScheduleContainer, curriculumContainer,
         projectsContainer, calendarContainer, enrollmentContainer,
         hostelContainer, profileContainer, calculatorContainer
     ];
@@ -110,8 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeNav && !['academics', 'examinations', 'extra'].includes(activeNav.dataset.section)) {
             const sectionId = activeNav.dataset.section;
             if (sectionId === 'dashboard') {
-                // Only fetch if we don't have data (or just redraw from cache ideally, but re-fetching ensures sync)
-                // Using sequential fetching to prevent issues
                 fetchTimetableAndCourses()
                     .then(() => fetchAndCalculateAttendanceSnapshot())
                     .then(() => fetchAndDisplayODSnapshot());
@@ -133,7 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         if(window.initAttendanceCalculator) window.initAttendanceCalculator(calculatorContainer, cachedAttendance, cachedTimetable);
                     }
                 } else {
-                     // Simulate click to reuse fetching logic
                      activeSub.click();
                 }
             }
@@ -220,7 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { handleFetchError(error, timetableContainer); }
     }
     
-    // Fixed populateTodaySchedule
     function populateTodaySchedule(timetableData) {
         if (!timetableData) { todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">Could not load timetable data.</p>'; return; }
         const dayMap = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -260,6 +255,89 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
+    
+    // Event Delegation for Attendance Details (Fix for Issue 1)
+    document.body.addEventListener('click', (e) => {
+        const btn = e.target.closest('.view-attendance-detail');
+        if (btn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const classId = btn.dataset.classId;
+            const slot = btn.dataset.slot;
+            const courseTitle = btn.dataset.courseTitle;
+            openAttendanceDetailModal(classId, slot, courseTitle);
+        }
+    });
+
+    function openAttendanceDetailModal(classId, slot, courseTitle) {
+        modalTitle.textContent = courseTitle || "Attendance Details";
+        modalBody.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-10">
+                <i data-lucide="loader" class="animate-spin h-8 w-8 text-indigo-500 mb-3"></i>
+                <p class="text-gray-500 dark:text-gray-400">Fetching details...</p>
+            </div>
+        `;
+        lucide.createIcons();
+
+        // Show modal
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95', 'opacity-0');
+        }, 10);
+
+        fetchAttendanceDetails(classId, slot);
+    }
+
+    async function fetchAttendanceDetails(classId, slot) {
+        try {
+            const payload = {
+                session_id: localStorage.getItem('vtop_session_id'),
+                class_id: classId,
+                slot: slot,
+                semesterSubId: currentSemesterId
+            };
+
+            const response = await fetch(`${API_BASE_URL}/${ATTENDANCE_DETAIL_TARGET}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                modalBody.innerHTML = data.html_content;
+            } else {
+                modalBody.innerHTML = `<div class="p-5 text-center text-red-500"><p>Error: ${data.message}</p></div>`;
+            }
+        } catch (error) {
+            console.error(error);
+            modalBody.innerHTML = `<div class="p-5 text-center text-red-500"><p>Network error. Please try again.</p></div>`;
+        }
+    }
+
+    // Close Modal Logic
+    if (modalCloseBtn) {
+        modalCloseBtn.addEventListener('click', () => {
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modalBody.innerHTML = ''; // Clear content
+            }, 300); // Wait for transition
+        });
+    }
+    
+    // Close modal on click outside
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modalCloseBtn.click();
+            }
+        });
+    }
+
+
     if (btnQuickAttendance) btnQuickAttendance.addEventListener('click', (e) => { e.preventDefault(); document.querySelector('.nav-link-child[data-subsection="academics-attendance"]').click(); });
     if (btnQuickMarks) btnQuickMarks.addEventListener('click', (e) => { e.preventDefault(); document.querySelector('.nav-link-child[data-subsection="examinations-marks"]').click(); });
 
@@ -269,7 +347,6 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             showPageSection(link.dataset.section);
             const section = link.dataset.section;
-            // IMPORTANT: Removed automatic refresh for 'dashboard' to prevent re-fetching
             if (section === 'enrollment') fetchAndDisplay(ENROLLMENT_TARGET, enrollmentContainer, "Course Enrollment");
             else if (section === 'hostel') fetchAndDisplay(HOSTEL_TARGET, hostelContainer, "Hostel");
             else if (section === 'profile') fetchAndDisplay(PROFILE_TARGET, profileContainer, "Profile");
