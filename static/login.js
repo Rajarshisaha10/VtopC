@@ -22,17 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- UI HELPER FUNCTIONS ---
     function setStatus(message, isError = false) {
-        // Only show status if it's an error (like invalid password) or a critical loading state
         if (isError) {
-            // Only check for specific keywords if we want to mask the message
-            let displayMessage = message;
-            
-            // If the server message is about captcha, we generally don't want to show it to the user 
-            // because it's handled automatically. However, if it's a hard failure (retries exhausted),
-            // we might show a generic error.
-            // BUT, per your request, we keep "Invalid Username/Password" errors visible.
-            
-            statusMessage.textContent = displayMessage;
+            statusMessage.textContent = message;
             statusMessage.className = `mt-6 text-center text-sm text-red-600`;
         } else {
             statusMessage.textContent = ""; 
@@ -163,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
                  preFetchCaptcha(true, true);
             } else {
                 showLoginScreen();
-                // Just show the error message from server directly (e.g., "Invalid User/Pass")
                 setStatus(data.message, true); 
                 preFetchCaptcha(false, false); 
             }
@@ -200,14 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
             
             } else if (data.status === 'invalid_captcha') {
                 console.log("Manual login captcha failed. Retrying silently...");
-                // Don't show any status to user, just retry
                 preFetchCaptcha(true); 
             
             } else {
-                // This block handles Invalid Username/Password, Locked Account etc.
                 setStatus(data.message, true); 
                 setButtonLoading(false); 
-                preFetchCaptcha(false); 
+                preFetchCaptcha(false);
             }
 
         } catch (error) {
@@ -231,5 +219,17 @@ document.addEventListener('DOMContentLoaded', () => {
         icon.classList.toggle('fa-eye-slash');
     });
 
+    captchaInput.addEventListener('input', () => {
+        captchaInput.value = captchaInput.value.toUpperCase();
+    });
+
     checkSession();
+
+    // --- PWA SERVICE WORKER REGISTRATION ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+        .register('/sw.js')
+        .then(() => { console.log('Service Worker Registered at root scope (Login)'); })
+        .catch(err => console.error('SW Registration failed:', err));
+    }
 });

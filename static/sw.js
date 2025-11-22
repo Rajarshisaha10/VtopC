@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mycampus-store-v2'; // Incremented version to force update
+const CACHE_NAME = 'mycampus-store-v3'; // Increment this to force update on client devices
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -21,9 +21,9 @@ const ASSETS_TO_CACHE = [
   '/static/bitmaps.js'
 ];
 
-// 1. Install Event: Cache the "App Shell" (HTML + Static Assets)
+// 1. Install Event: Cache the "App Shell" immediately
 self.addEventListener('install', (e) => {
-  self.skipWaiting(); // Forces this SW to become active immediately
+  self.skipWaiting(); // Force this SW to become active immediately
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[SW] Caching App Shell');
@@ -32,12 +32,13 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// 2. Activate Event: Clean up old caches
+// 2. Activate Event: Clean up old caches to prevent conflicts
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => {
         if (key !== CACHE_NAME) {
+          console.log('[SW] Removing old cache', key);
           return caches.delete(key);
         }
       }));
@@ -46,23 +47,25 @@ self.addEventListener('activate', (e) => {
   return self.clients.claim(); // Take control of all clients immediately
 });
 
-// 3. Fetch Event: The Core Logic
+// 3. Fetch Event: The Offline Guard
 self.addEventListener('fetch', (e) => {
   
   // A. Handle Navigation Requests (HTML Pages)
-  // This is what prevents the "Unable to connect" screen.
+  // This is the CRITICAL part that stops the "You're offline" screen.
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request)
         .catch(() => {
           // If network fails (offline), return the cached Dashboard HTML
+          // We map '/' to the dashboard. Even if they were at /profile, serve the shell.
           return caches.match('/'); 
         })
     );
     return;
   }
 
-  // B. Handle Static Assets (JS, CSS, Images) -> Cache First
+  // B. Handle Static Assets (JS, CSS, Images) -> Cache First, Fallback to Network
+  // We only cache GET requests. API calls (POST) pass through to be handled by data.js
   if (e.request.method === 'GET') {
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {

@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Event Listeners ---
+    // Event Listeners
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.view-attendance-detail');
         if (btn) {
@@ -204,7 +204,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.unlockCredentials = async function() {
-        // (Keep existing unlock logic)
         const passwordInput = document.getElementById('creds-password-input');
         const unlockBtn = document.getElementById('creds-unlock-btn');
         const errorMsg = document.getElementById('creds-error');
@@ -256,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const cachedRegNo = localStorage.getItem('vtop_regno_cache');
         
         if (elements.sidebarUsername) elements.sidebarUsername.textContent = cachedName || 'User';
-        // Use cached status or default to 'Offline' (avoiding "No Internet Connection")
         if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = cachedRegNo || 'Offline';
         
         const savedSemId = localStorage.getItem('vtop_semester_id');
@@ -273,7 +271,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedSessionId = localStorage.getItem('vtop_session_id');
         if (!savedSessionId) { window.location.href = '/login'; return; }
         
-        // Immediate offline check
         if (!navigator.onLine) { startOfflineMode(); return; }
 
         try {
@@ -281,25 +278,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error("Session check failed");
             const data = await response.json();
             if (data.status === 'success') {
-                // Update sidebar
                 const userName = data.username || 'User';
                 const regStatus = 'Session Active';
 
                 if (elements.sidebarUsername) elements.sidebarUsername.textContent = userName;
                 if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = regStatus;
                 
-                // Cache these for offline use
                 localStorage.setItem('vtop_username_cache', userName);
                 localStorage.setItem('vtop_regno_cache', regStatus);
                 
                 populateSemesterDropdown(); 
             } else { 
-                // Explicit failure from server = logout
                 localStorage.removeItem('vtop_session_id'); 
                 window.location.href = '/login'; 
             }
         } catch (error) { 
-            // Network/Fetch error = Offline Mode
             startOfflineMode();
         }
     }
@@ -326,7 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 refreshCurrentPage();
             }
         } catch (error) { 
-            // Fallback if dropdown fetch fails
             const savedSemId = localStorage.getItem('vtop_semester_id');
             if(savedSemId) {
                  state.setSemesterId(savedSemId);
@@ -339,4 +331,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof lucide !== 'undefined') lucide.createIcons();
     UI.showPageSection('dashboard', elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
     checkSession();
+
+    // --- CRITICAL PWA UPDATE ---
+    // Register SW at ROOT scope so it controls everything including / and /login
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+        .register('/sw.js') // Point to the new root route in app.py
+        .then(() => { console.log('Service Worker Registered at root scope'); })
+        .catch(err => console.error('SW Registration failed:', err));
+    }
 });
