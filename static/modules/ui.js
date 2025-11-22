@@ -31,12 +31,27 @@ export function clearAllDataContainers(containers) {
     const snapshotOdCount = document.getElementById('snapshot-od-count');
     const snapshotOdBar = document.getElementById('snapshot-od-bar');
     const todayScheduleContainer = document.getElementById('today-schedule-container');
+    
+    // Remove any existing offline banner
+    const existingBanner = document.getElementById('offline-banner');
+    if (existingBanner) existingBanner.remove();
 
     if (snapshotAttPerc) snapshotAttPerc.textContent = '...';
     if (snapshotAttBar) snapshotAttBar.style.width = '0%';
     if (snapshotOdCount) snapshotOdCount.textContent = '... / 40';
     if (snapshotOdBar) snapshotOdBar.style.width = '0%';
     if (todayScheduleContainer) todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">Loading today\'s schedule...</p>';
+}
+
+export function showOfflineMessage(container) {
+    const msg = document.createElement('div');
+    msg.id = 'offline-banner';
+    msg.className = 'mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg text-sm text-yellow-700 dark:text-yellow-300 flex items-center';
+    msg.innerHTML = `
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"></path></svg>
+        You are offline. Showing cached data.
+    `;
+    if (container) container.prepend(msg);
 }
 
 export function populateTodaySchedule(timetableData, container) {
