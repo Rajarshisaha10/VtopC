@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeNav && !['academics', 'examinations', 'extra'].includes(activeNav.dataset.section)) {
             const sectionId = activeNav.dataset.section;
             if (sectionId === 'dashboard') {
+                // This will now load from cache first, then update
                 Data.fetchTimetableAndCourses(null, null, elements.todaySchedule)
                     .then(() => Data.fetchAndCalculateAttendanceSnapshot())
                     .then(() => Data.fetchAndDisplayODSnapshot());

@@ -40,3 +40,12 @@ details > summary::-webkit-details-marker {
 details[open] summary .arrow { 
     transform: rotate(90deg); 
 }
+
+/* Toast Animation for Cache Updates */
+@keyframes toast-in {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.toast-enter {
+    animation: toast-in 0.3s ease-out forwards;
+}

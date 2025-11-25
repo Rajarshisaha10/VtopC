@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mycampus-store-v3'; // Increment this to force update on client devices
+const CACHE_NAME = 'mycampus-store-v4'; // Incremented version to v4
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -51,7 +51,6 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   
   // A. Handle Navigation Requests (HTML Pages)
-  // This is the CRITICAL part that stops the "You're offline" screen.
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request)
