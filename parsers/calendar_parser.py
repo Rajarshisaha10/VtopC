@@ -124,3 +124,24 @@ def parse_class_groups(html_content):
             options.add(val)
             
     return options
+
+def get_day_order(events):
+    """
+    Scans events for day order text and returns the corresponding day key (MON, TUE, etc.)
+    e.g., "Monday Order" -> "MON"
+    """
+    if not events: return None
+    
+    text_map = {
+        "monday": "MON", "tuesday": "TUE", "wednesday": "WED", 
+        "thursday": "THU", "friday": "FRI", "saturday": "SAT", "sunday": "SUN"
+    }
+    
+    for event in events:
+        text = event.get('text', '').lower()
+        # Looking for strings like "Monday Order", "Tuesday Day Order", etc.
+        if 'order' in text:
+            for day_name, day_code in text_map.items():
+                if day_name in text:
+                    return day_code
+    return None

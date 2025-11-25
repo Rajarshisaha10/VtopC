@@ -10,7 +10,7 @@ from auth import get_serializer
 from session_manager import session_storage
 from parsers.timetable_parser import parse_course_data
 from parsers.attendance_parser import parse_attendance_summary, parse_attendance_detail
-from parsers.calendar_parser import parse_academic_calendar, parse_class_groups
+from parsers.calendar_parser import parse_academic_calendar, parse_class_groups, get_day_order
 from parsers.marks_parser import parse_marks
 from parsers.exam_schedule_parser import parse_exam_schedule
 from parsers.profile_parser import parse_profile
@@ -20,7 +20,6 @@ warnings.filterwarnings('ignore', category=requests.packages.urllib3.exceptions.
 
 data_bp = Blueprint('data_bp', __name__)
 
-# ... [Previous constants remain the same] ...
 TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
 ATTENDANCE_TARGET = 'processViewStudentAttendance'
 ATTENDANCE_DETAIL_TARGET = 'processViewAttendanceDetail'
@@ -31,7 +30,6 @@ MARKS_TARGET = 'examinations/doStudentMarkView'
 EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent'
 PROFILE_TARGET = 'student/studentProfileView'
 
-# ... [get_session_details and get_semesters functions remain the same] ...
 def get_session_details(session_id):
     if not session_id or 'session' not in session_storage.get(session_id, {}):
         raise Exception("Invalid session.")
@@ -82,15 +80,64 @@ def fetch_data():
     target = data.get('target')
     semester_sub_id = data.get('semesterSubId')
     cal_date = data.get('calDate') 
+    include_day_order = data.get('includeDayOrder', False) # Flag to force day order check
 
     try:
         session, authorized_id, csrf_token, base_url = get_session_details(session_id)
         headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
 
         if target == TIMETABLE_TARGET:
+            # 1. Fetch Standard Timetable
             payload = {'authorizedID': authorized_id, '_csrf': csrf_token, 'semesterSubId': semester_sub_id}
             res = session.post(f"{base_url}/processViewTimeTable", data=payload, headers=headers, verify=False)
             parsed_data = parse_course_data(res.text)
+
+            # 2. Day Order Patch
+            # We check if today is Saturday OR if the client explicitly requested the day order check (e.g., Timetable Tab)
+            is_saturday = datetime.datetime.now().weekday() == 5
+            
+            if is_saturday or include_day_order:
+                # Calculate the date of the ongoing week's Saturday
+                # Python weekday: Mon=0...Sat=5...Sun=6
+                now = datetime.datetime.now()
+                # Offset to get to Saturday (5)
+                days_offset = 5 - now.weekday()
+                target_saturday = now + datetime.timedelta(days=days_offset)
+                
+                cal_month_str = target_saturday.strftime("01-%b-%Y").upper()
+                
+                # Fetch Calendar for that month (using default 'ALL' group for simplicity/speed)
+                cal_payload = { 
+                    'authorizedID': authorized_id, 
+                    '_csrf': csrf_token, 
+                    'calDate': cal_month_str, 
+                    'semSubId': semester_sub_id, 
+                    'classGroupId': 'ALL', 
+                    'x': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT") 
+                }
+                # Note: We perform this request inside the same try block but if it fails we catch it specifically 
+                # so we don't fail the whole timetable request.
+                try:
+                    cal_res = session.post(f"{base_url}/{CALENDAR_VIEW_TARGET}", data=cal_payload, headers=headers, verify=False)
+                    cal_data = parse_academic_calendar(cal_res.text)
+                    
+                    if cal_data and 'days' in cal_data:
+                        # Find our specific Saturday
+                        for day_obj in cal_data['days']:
+                            if day_obj['day'] == target_saturday.day:
+                                # Check for day order mapping (e.g., "Monday Order" -> "MON")
+                                day_order_code = get_day_order(day_obj.get('events', []))
+                                
+                                if day_order_code and day_order_code in parsed_data['timetable']:
+                                    # Apply Day Order: Overwrite SAT schedule with the mapped day's schedule
+                                    parsed_data['timetable']['SAT'] = parsed_data['timetable'][day_order_code].copy()
+                                    # Add meta-data so frontend knows (optional)
+                                    parsed_data['day_order_active'] = day_order_code
+                                break
+                except Exception as e:
+                    # Log the error but proceed with standard timetable
+                    print(f"Day Order Patch Warning: Could not fetch calendar data. {str(e)}")
+
             html = render_template('timetable_content.html', data=parsed_data)
             return jsonify({'status': 'success', 'html_content': html, 'raw_data': parsed_data})
 
@@ -235,8 +282,6 @@ def fetch_profile_credentials():
         parsed_data = parse_credentials(creds_res.text)
         
         # Render just the table part using a new mini-template string or reusable block
-        # For simplicity, we'll return the JSON data and let frontend build it, 
-        # OR render a partial template. Let's render a partial for consistency.
         html = render_template('credentials_table_partial.html', data=parsed_data)
         
         return jsonify({'status': 'success', 'html_content': html})
@@ -244,7 +289,6 @@ def fetch_profile_credentials():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# ... [Other routes like fetch_attendance_detail and get_od_snapshot remain unchanged] ...
 @data_bp.route('/fetch-attendance-detail', methods=['POST'])
 def fetch_attendance_detail():
     data = request.json
