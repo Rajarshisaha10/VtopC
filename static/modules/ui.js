@@ -96,7 +96,8 @@ export function updateAttendanceSnapshot(data) {
     let percentage = 0;
     if (totalConducted > 0) percentage = (totalAttended / totalConducted) * 100;
     if (snapshotAttPerc) {
-         const p = (Math.floor(percentage * 100) / 100).toFixed(0); 
+         // Changed to Math.floor to display lower integer value
+         const p = Math.floor(percentage);
          snapshotAttPerc.textContent = `${p}%`;
          snapshotAttBar.style.width = `${p}%`;
     }

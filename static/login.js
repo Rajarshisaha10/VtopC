@@ -33,7 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function setButtonLoading(isLoading) {
         loginButtonText.textContent = isLoading ? 'Processing...' : 'Login';
         loginButton.disabled = isLoading;
-        loginButtonSpinner.classList.toggle('hidden', !isLoading);
+        // Toggle visibility of the Lucide spinner
+        if(loginButtonSpinner) {
+             if(isLoading) loginButtonSpinner.classList.remove('hidden');
+             else loginButtonSpinner.classList.add('hidden');
+        }
     }
     
     function showLoginScreen() {
@@ -211,12 +215,18 @@ document.addEventListener('DOMContentLoaded', () => {
         handleLoginAttempt();
     });
 
+    // Updated for Lucide Icons
     togglePasswordBtn.addEventListener('click', () => {
         const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
         passwordInput.setAttribute('type', type);
-        const icon = togglePasswordBtn.querySelector('i');
-        icon.classList.toggle('fa-eye');
-        icon.classList.toggle('fa-eye-slash');
+        
+        const eyeIcon = document.getElementById('icon-eye');
+        const eyeOffIcon = document.getElementById('icon-eye-off');
+        
+        if(eyeIcon && eyeOffIcon) {
+            eyeIcon.classList.toggle('hidden');
+            eyeOffIcon.classList.toggle('hidden');
+        }
     });
 
     captchaInput.addEventListener('input', () => {
@@ -232,4 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(() => { console.log('Service Worker Registered at root scope (Login)'); })
         .catch(err => console.error('SW Registration failed:', err));
     }
+    
+    // Re-init icons
+    if(typeof lucide !== 'undefined') lucide.createIcons();
 });

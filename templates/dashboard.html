@@ -7,8 +7,8 @@
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
 
-
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- LOCAL TAILWIND (Runs offline) -->
+    <script src="{{ url_for('static', filename='tailwind.js') }}"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -25,10 +25,10 @@
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Fallback font if offline -->
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        /* Simple system font stack for offline usage if Google Fonts fail */
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         .sidebar { transition: transform 0.3s ease-in-out; }
         .sidebar-hidden { transform: translateX(-100%); }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -48,6 +48,11 @@
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
     </style>
+    
+    <!-- LOCAL ICONS & UTILS -->
+    <script src="{{ url_for('static', filename='lucide.js') }}"></script>
+    <!-- Google Fonts (Optional, will fail gracefully offline) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="flex h-[100dvh] overflow-hidden bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-200">
     
@@ -227,7 +232,8 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <!-- LOCAL ALPINE JS -->
+    <script src="{{ url_for('static', filename='alpine.js') }}" defer></script>
     <script>
         const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         document.getElementById('current-date-display').textContent = new Date().toLocaleDateString('en-US', dateOptions);
@@ -237,7 +243,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
-            .register('/static/sw.js')
+            .register('/sw.js') // Root scope
             .then(() => { console.log('Service Worker Registered'); });
         }
     </script>

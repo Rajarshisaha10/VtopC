@@ -172,11 +172,6 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
             try {
                 localStorage.setItem(getStorageKey(target, extraParams), JSON.stringify(data));
                 console.log(`[Cache] Updated ${target}`);
-                
-                // Optional: Show a subtle toast if we updated content that the user was already looking at
-                if (hasCachedData) {
-                    // showToast("Data updated"); // Helper can be added if desired
-                }
             } catch(e) { console.warn("Cache save failed", e); }
 
         } else {
@@ -371,11 +366,32 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
 }
 
 export async function fetchAndDisplayODSnapshot() {
-    if (!state.currentSemesterId || !navigator.onLine) return;
+    if (!state.currentSemesterId) return;
+    const cacheKey = `vtop_cache_od_snapshot_${state.currentSemesterId}`;
+
+    // 1. Cache First
+    const cachedString = localStorage.getItem(cacheKey);
+    if (cachedString) {
+        try {
+            const cachedData = JSON.parse(cachedString);
+            UI.updateODSnapshot(cachedData);
+            console.log('[Cache] Loaded OD Snapshot');
+        } catch(e) { console.error(e); }
+    } else {
+        const el = document.getElementById('snapshot-od-count');
+        if (el) el.textContent = '... / 40';
+    }
+
+    if (!navigator.onLine) return;
+
     try {
         const response = await fetch(`${API_BASE_URL}/get-od-snapshot`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), semesterSubId: state.currentSemesterId }) });
         const data = await response.json();
-        if (data.status === 'success') UI.updateODSnapshot(data);
+        if (data.status === 'success') {
+            UI.updateODSnapshot(data);
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+            console.log('[Data] Updated OD Snapshot cache');
+        }
     } catch (e) { console.error(e); }
 }
 

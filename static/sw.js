@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mycampus-store-v4'; // Incremented version to v4
+const CACHE_NAME = 'mycampus-store-v5'; // Incremented version to force update
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -18,7 +18,11 @@ const ASSETS_TO_CACHE = [
   // Helpers
   '/static/calculator.js',
   '/static/solver.js',
-  '/static/bitmaps.js'
+  '/static/bitmaps.js',
+  // CRITICAL: Offline Libraries (These were missing before)
+  '/static/tailwind.js',
+  '/static/lucide.js',
+  '/static/alpine.js'
 ];
 
 // 1. Install Event: Cache the "App Shell" immediately
