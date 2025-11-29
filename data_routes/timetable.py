@@ -8,19 +8,32 @@ from .utils import get_session_details
 TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
 CALENDAR_VIEW_TARGET = 'processViewCalendar'
 
+def fetch_available_semesters(session, base_url, authorized_id, csrf_token):
+    """
+    Helper to fetch the list of semesters from VTOP.
+    Returns a list of dicts: [{'id': '...', 'name': '...'}]
+    """
+    headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
+    # Check standard timetable page which contains the semester dropdown
+    res = session.post(f"{base_url}/{TIMETABLE_TARGET}", 
+                       data={'authorizedID': authorized_id, '_csrf': csrf_token, 'verifyMenu': 'true'}, 
+                       headers=headers, verify=False)
+    res.raise_for_status()
+    
+    soup = BeautifulSoup(res.text, 'html.parser')
+    sem_select = soup.find('select', {'id': 'semesterSubId'})
+    semesters = []
+    if sem_select:
+        for opt in sem_select.find_all('option'):
+            if opt.get('value'): 
+                semesters.append({'id': opt['value'], 'name': opt.get_text(strip=True)})
+    return semesters
+
 def get_semesters(request):
     session_id = request.json.get('session_id')
     try:
         session, authorized_id, csrf_token, base_url = get_session_details(session_id)
-        headers = {'X-Requested-With': 'XMLHttpRequest', 'Referer': f"{base_url}/content"}
-        res = session.post(f"{base_url}/{TIMETABLE_TARGET}", data={'authorizedID': authorized_id, '_csrf': csrf_token, 'verifyMenu': 'true'}, headers=headers, verify=False)
-        res.raise_for_status()
-        soup = BeautifulSoup(res.text, 'html.parser')
-        sem_select = soup.find('select', {'id': 'semesterSubId'})
-        semesters = []
-        if sem_select:
-            for opt in sem_select.find_all('option'):
-                if opt.get('value'): semesters.append({'id': opt['value'], 'name': opt.get_text(strip=True)})
+        semesters = fetch_available_semesters(session, base_url, authorized_id, csrf_token)
         return jsonify({'status': 'success', 'semesters': semesters})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 401
