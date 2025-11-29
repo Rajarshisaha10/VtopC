@@ -64,27 +64,20 @@ function handleFetchError(error, container, target, params) {
     console.warn('[Network] Fetch failed:', error);
 
     // Check if container already has content (from cache)
-    // We check for the specific loading spinner we add. If it's NOT there, it means real content is visible.
     const isContentVisible = container && !container.innerHTML.includes('animate-spin');
 
     if (isContentVisible) {
-        // Content is visible (stale cache), just log the error.
-        // Optionally add a small "Offline" indicator here if needed.
         console.log('[Network] keeping cached data visible.');
         
-        // Special case: Session expired should always redirect, even if cache exists
         if (error.message.includes("Session expired")) {
             localStorage.removeItem('vtop_session_id');
             window.location.href = '/login';
         }
     } else {
-        // Screen is loading, so we MUST show an error or try cache fallback
         if (loadFromCache(target, container, params)) {
-            // Fallback succeeded
             return;
         }
 
-        // Both Network and Cache failed
         if (container) {
             if (error.message.includes("Session expired")) {
                 localStorage.removeItem('vtop_session_id');
@@ -132,7 +125,7 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         if (!hasCachedData) {
             containerElement.innerHTML = `<div class="p-6 text-center"><p class="text-gray-500">No data available offline.</p></div>`;
         }
-        return; // Stop here if offline
+        return; 
     }
 
     // STEP 4: Network Fetch (Background Refresh)
@@ -159,8 +152,25 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         const data = await response.json();
         
         if (data.status === 'success') { 
-            // A. Update UI with fresh data (Seamless replacement)
-            // We only replace if the new data is different or if we want to force refresh
+            // --- CRITICAL FIX START: Handle Auto-Semester Switch ---
+            if (data.new_semester_id && data.new_semester_id !== state.currentSemesterId) {
+                console.log(`[Data] Auto-switching semester to ${data.new_semester_id}`);
+                
+                // 1. Update Internal State
+                state.setSemesterId(data.new_semester_id);
+                
+                // 2. Persist to Storage
+                localStorage.setItem('vtop_semester_id', data.new_semester_id);
+                
+                // 3. Update UI Dropdown (Visual Sync)
+                const semSelect = document.getElementById('semester-select');
+                if (semSelect) {
+                    semSelect.value = data.new_semester_id;
+                }
+            }
+            // --- CRITICAL FIX END ---
+
+            // A. Update UI with fresh data
             containerElement.innerHTML = data.html_content; 
             if (typeof lucide !== 'undefined') lucide.createIcons(); 
             
@@ -169,6 +179,7 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
             if (target === TARGETS.TIMETABLE) state.setTimetable(data.raw_data.timetable);
             
             // C. Save to Persistent Cache
+            // Note: We do this AFTER updating state.currentSemesterId so the key is correct
             try {
                 localStorage.setItem(getStorageKey(target, extraParams), JSON.stringify(data));
                 console.log(`[Cache] Updated ${target}`);
@@ -187,7 +198,6 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
 
 export async function fetchAttendanceForCache() {
     const target = TARGETS.ATTENDANCE;
-    // Check cache first to populate state immediately for calculators
     const c = localStorage.getItem(getStorageKey(target));
     if(c) state.setAttendance(JSON.parse(c).raw_data);
 
@@ -281,12 +291,9 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
     if (!state.currentSemesterId) return;
     const target = TARGETS.TIMETABLE;
     
-    // Renderer logic that works for both Cache and Network data
     const renderData = (data) => {
         state.setTimetable(data.raw_data.timetable);
         
-        // If specific containers are passed (Course List or Full Timetable), render them
-        // using the HTML fragment from server
         if (coursesContainer || timetableContainer) {
              const parser = new DOMParser();
              const doc = parser.parseFromString(data.html_content, 'text/html');
@@ -303,7 +310,6 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
              }
         }
 
-        // Always update the "Today's Schedule" widget if it exists
         if (todayScheduleContainer) {
             UI.populateTodaySchedule(data.raw_data.timetable, todayScheduleContainer);
         }
@@ -333,7 +339,7 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
          return;
     }
 
-    // 3. Loading UI (Only shown if cache was missing)
+    // 3. Loading UI
     const loadingHTML = `<div class="p-8 text-center text-gray-500 flex flex-col items-center justify-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Loading data...</p></div>`;
     
     if (!hasCache) {
@@ -356,8 +362,8 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
         });
         const data = await response.json();
         if (data.status === 'success') {
-            renderData(data); // Updates UI with fresh data
-            localStorage.setItem(cacheKey, JSON.stringify(data)); // Updates Cache
+            renderData(data); 
+            localStorage.setItem(cacheKey, JSON.stringify(data)); 
         } else throw new Error(data.message);
     } catch (error) { 
         console.error(error);
@@ -369,13 +375,11 @@ export async function fetchAndDisplayODSnapshot() {
     if (!state.currentSemesterId) return;
     const cacheKey = `vtop_cache_od_snapshot_${state.currentSemesterId}`;
 
-    // 1. Cache First
     const cachedString = localStorage.getItem(cacheKey);
     if (cachedString) {
         try {
             const cachedData = JSON.parse(cachedString);
             UI.updateODSnapshot(cachedData);
-            console.log('[Cache] Loaded OD Snapshot');
         } catch(e) { console.error(e); }
     } else {
         const el = document.getElementById('snapshot-od-count');
@@ -390,7 +394,6 @@ export async function fetchAndDisplayODSnapshot() {
         if (data.status === 'success') {
             UI.updateODSnapshot(data);
             localStorage.setItem(cacheKey, JSON.stringify(data));
-            console.log('[Data] Updated OD Snapshot cache');
         }
     } catch (e) { console.error(e); }
 }
