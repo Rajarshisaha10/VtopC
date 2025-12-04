@@ -355,9 +355,15 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Master
                                     Password</label>
-                                <input type="password" id="dir-password"
-                                    class="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
-                                    placeholder="Enter decryption key">
+                                <div class="relative">
+                                    <input type="password" id="dir-password"
+                                        class="w-full p-2.5 pr-10 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
+                                        placeholder="Enter decryption key">
+                                    <button type="button" id="dir-toggle-password"
+                                        class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none">
+                                        <i data-lucide="eye" class="h-5 w-5"></i>
+                                    </button>
+                                </div>
                             </div>
                             <button id="dir-unlock-btn"
                                 class="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center">
@@ -426,7 +432,7 @@
         document.getElementById('current-date-display').textContent = new Date().toLocaleDateString('en-US', dateOptions);
     </script>
     <script src="{{ url_for('static', filename='calculator.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='dashboard.js') }}?v=6"></script>
+    <script type="module" src="{{ url_for('static', filename='dashboard.js') }}?v=7"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker

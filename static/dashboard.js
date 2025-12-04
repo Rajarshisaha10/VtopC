@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Secure Directory Elements
         dirPassword: document.getElementById('dir-password'),
+        dirTogglePassword: document.getElementById('dir-toggle-password'),
         dirSearch: document.getElementById('dir-search'),
         dirSearchBtn: document.getElementById('dir-search-btn'),
         dirResults: document.getElementById('dir-results'),
@@ -176,6 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     elements.dirResults.classList.add('hidden');
                     elements.dirResults.innerHTML = '';
 
+                    // Reset eye icon
+                    if (elements.dirTogglePassword) {
+                        elements.dirPassword.type = 'password';
+                        elements.dirTogglePassword.innerHTML = '<i data-lucide="eye" class="h-5 w-5"></i>';
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                    }
+
                     // Show Lock Screen
                     elements.dirLockScreen.classList.remove('hidden');
                     elements.dirSearchScreen.classList.add('hidden');
@@ -235,6 +243,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Directory Logic ---
 
+    // 0. Toggle Password Visibility
+    if (elements.dirTogglePassword) {
+        elements.dirTogglePassword.addEventListener('click', () => {
+            const type = elements.dirPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+            elements.dirPassword.setAttribute('type', type);
+
+            // Toggle Icon
+            if (type === 'password') {
+                elements.dirTogglePassword.innerHTML = '<i data-lucide="eye" class="h-5 w-5"></i>';
+            } else {
+                elements.dirTogglePassword.innerHTML = '<i data-lucide="eye-off" class="h-5 w-5"></i>';
+            }
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+    }
+
     // 1. Unlock Handler (Downloads & Decrypts EVERYTHING)
     if (elements.dirUnlockBtn) {
         elements.dirUnlockBtn.addEventListener('click', async () => {
@@ -271,13 +295,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 const db = getFirestore(app);
 
                 // 1. Fetch ALL documents
-                console.log("DEBUG: Downloading entire database...");
-                const querySnapshot = await getDocs(collection(db, "encrypted_students"));
+                console.log("DEBUG: Attempting to fetch encrypted database from Firestore...");
+
+                let querySnapshot;
+                try {
+                    querySnapshot = await getDocs(collection(db, "encrypted_students"));
+                } catch (fetchError) {
+                    console.error("DEBUG: FETCH FAILED. Details:", fetchError);
+                    let errMsg = "Database Unreachable.";
+                    if (fetchError.code === 'permission-denied') errMsg += " (Access Denied)";
+                    if (fetchError.code === 'unavailable') errMsg += " (Network Error)";
+                    throw new Error(errMsg);
+                }
 
                 decryptedStudentList = [];
                 let decryptionFailedCount = 0;
+                let successCount = 0;
+                let totalDocs = querySnapshot.size;
+
+                console.log(`DEBUG: Fetch Success. Records found: ${totalDocs}`);
+
+                if (totalDocs === 0) {
+                    alert("Database is empty. Please upload data first.");
+                    elements.dirUnlockBtn.innerHTML = originalBtnText;
+                    elements.dirUnlockBtn.disabled = false;
+                    return;
+                }
 
                 // 2. Decrypt ALL documents locally
+                console.log("DEBUG: Starting Decryption...");
                 querySnapshot.forEach((doc) => {
                     try {
                         const data = doc.data();
@@ -290,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             // Normalize data for easier search later
                             student._searchStr = `${student.Name} ${student.RegNo} ${student.Mail} ${student.Mobile}`.toLowerCase();
                             decryptedStudentList.push(student);
+                            successCount++;
                         } else {
                             decryptionFailedCount++;
                         }
@@ -298,14 +345,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                if (decryptedStudentList.length === 0) {
-                    alert("Unlock Failed: Incorrect password or empty database.");
+                console.log(`DEBUG: Decryption Complete. Success: ${successCount}, Failures: ${decryptionFailedCount}`);
+
+                if (successCount === 0) {
+                    // If everything failed, it's definitely the wrong password
+                    alert("Unlock Failed: Incorrect Password.");
                     elements.dirUnlockBtn.innerHTML = originalBtnText;
                     elements.dirUnlockBtn.disabled = false;
                     return;
                 }
-
-                console.log(`DEBUG: Successfully decrypted ${decryptedStudentList.length} records. Failed: ${decryptionFailedCount}`);
 
                 // Success! Switch UI
                 isDirectoryUnlocked = true;
@@ -317,8 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => elements.dirSearch.focus(), 100);
 
             } catch (error) {
-                console.error("Unlock Error:", error);
-                alert("Failed to connect or download database.");
+                console.error("DEBUG: Overall Process Error:", error);
+                alert(error.message || "Failed to connect or download database.");
                 elements.dirUnlockBtn.innerHTML = originalBtnText;
                 elements.dirUnlockBtn.disabled = false;
             }
