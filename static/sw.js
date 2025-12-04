@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mycampus-store-v5'; // Incremented version to force update
+const CACHE_NAME = 'mycampus-store-v6'; // Incremented version to force update
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -53,7 +53,7 @@ self.addEventListener('activate', (e) => {
 
 // 3. Fetch Event: The Offline Guard
 self.addEventListener('fetch', (e) => {
-  
+
   // A. Handle Navigation Requests (HTML Pages)
   if (e.request.mode === 'navigate') {
     e.respondWith(
@@ -61,7 +61,7 @@ self.addEventListener('fetch', (e) => {
         .catch(() => {
           // If network fails (offline), return the cached Dashboard HTML
           // We map '/' to the dashboard. Even if they were at /profile, serve the shell.
-          return caches.match('/'); 
+          return caches.match('/');
         })
     );
     return;

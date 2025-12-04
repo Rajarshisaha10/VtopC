@@ -3,8 +3,14 @@ import { state } from './modules/state.js';
 import * as UI from './modules/ui.js';
 import * as Data from './modules/data_service.js';
 
+// Firebase Config moved to dynamic import section
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded.");
+
+    // State for secure directory
+    let decryptedStudentList = []; // Store ALL students here after unlocking
+    let isDirectoryUnlocked = false;
 
     const elements = {
         menuToggle: document.getElementById('menu-toggle'),
@@ -34,6 +40,16 @@ document.addEventListener('DOMContentLoaded', () => {
         enrollment: document.getElementById('enrollment-container'),
         profile: document.getElementById('profile-container'),
         calculator: document.getElementById('extra-calculator'),
+
+        // Secure Directory Elements
+        dirPassword: document.getElementById('dir-password'),
+        dirSearch: document.getElementById('dir-search'),
+        dirSearchBtn: document.getElementById('dir-search-btn'),
+        dirResults: document.getElementById('dir-results'),
+        dirLockScreen: document.getElementById('dir-lock-screen'),
+        dirSearchScreen: document.getElementById('dir-search-screen'),
+        dirUnlockBtn: document.getElementById('dir-unlock-btn'),
+        dirLockBtn: document.getElementById('dir-lock-btn'),
 
         modal: document.getElementById('detail-modal'),
         modalContent: document.querySelector('.modal-content'),
@@ -152,6 +168,26 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (subsectionId === 'academics-calendar') Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar");
             else if (subsectionId === 'examinations-marks') Data.fetchAndDisplay(TARGETS.MARKS, elements.marks, "Marks");
             else if (subsectionId === 'examinations-schedule') Data.fetchAndDisplay(TARGETS.EXAM_SCHEDULE, elements.examSchedule, "Exam Schedule");
+            else if (subsectionId === 'extra-directory') {
+                // Reset Directory View IF LOCKED
+                if (!isDirectoryUnlocked) {
+                    elements.dirPassword.value = '';
+                    elements.dirSearch.value = '';
+                    elements.dirResults.classList.add('hidden');
+                    elements.dirResults.innerHTML = '';
+
+                    // Show Lock Screen
+                    elements.dirLockScreen.classList.remove('hidden');
+                    elements.dirSearchScreen.classList.add('hidden');
+
+                    setTimeout(() => elements.dirPassword.focus(), 100);
+                } else {
+                    // Already unlocked, show search
+                    elements.dirLockScreen.classList.add('hidden');
+                    elements.dirSearchScreen.classList.remove('hidden');
+                    setTimeout(() => elements.dirSearch.focus(), 100);
+                }
+            }
 
             closeSidebar();
             elements.contentContainer.scrollTop = 0;
@@ -194,6 +230,161 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.calendar.addEventListener('click', (e) => {
             const navBtn = e.target.closest('.calendar-nav-btn');
             if (navBtn) Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar", { calDate: navBtn.dataset.date });
+        });
+    }
+
+    // --- Directory Logic ---
+
+    // 1. Unlock Handler (Downloads & Decrypts EVERYTHING)
+    if (elements.dirUnlockBtn) {
+        elements.dirUnlockBtn.addEventListener('click', async () => {
+            const password = elements.dirPassword.value;
+            if (!password) {
+                alert("Please enter the password.");
+                return;
+            }
+
+            const originalBtnText = elements.dirUnlockBtn.innerHTML;
+            elements.dirUnlockBtn.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4 mr-2"></i> Unlocking & Syncing...';
+            elements.dirUnlockBtn.disabled = true;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            try {
+                // Generate Key
+                const key = CryptoJS.SHA256(password);
+
+                // --- Dynamic Import ---
+                const { initializeApp } = await import('https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js');
+                const { getFirestore, collection, getDocs } = await import('https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js');
+
+                const firebaseConfig = {
+                    apiKey: "AIzaSyBsdpGsNO3y6a0EapBakU1cS6WC0pEoXSU",
+                    authDomain: "vitc29.firebaseapp.com",
+                    projectId: "vitc29",
+                    storageBucket: "vitc29.firebasestorage.app",
+                    messagingSenderId: "376204861458",
+                    appId: "1:376204861458:web:5dc7fdaa74f2650911f8cb",
+                    measurementId: "G-733GMSBTQQ"
+                };
+
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+
+                // 1. Fetch ALL documents
+                console.log("DEBUG: Downloading entire database...");
+                const querySnapshot = await getDocs(collection(db, "encrypted_students"));
+
+                decryptedStudentList = [];
+                let decryptionFailedCount = 0;
+
+                // 2. Decrypt ALL documents locally
+                querySnapshot.forEach((doc) => {
+                    try {
+                        const data = doc.data();
+                        // Decrypt
+                        const decrypted = CryptoJS.AES.decrypt(data.blob, key, { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 });
+                        const jsonString = decrypted.toString(CryptoJS.enc.Utf8);
+
+                        if (jsonString && jsonString.startsWith('{')) {
+                            const student = JSON.parse(jsonString);
+                            // Normalize data for easier search later
+                            student._searchStr = `${student.Name} ${student.RegNo} ${student.Mail} ${student.Mobile}`.toLowerCase();
+                            decryptedStudentList.push(student);
+                        } else {
+                            decryptionFailedCount++;
+                        }
+                    } catch (e) {
+                        decryptionFailedCount++;
+                    }
+                });
+
+                if (decryptedStudentList.length === 0) {
+                    alert("Unlock Failed: Incorrect password or empty database.");
+                    elements.dirUnlockBtn.innerHTML = originalBtnText;
+                    elements.dirUnlockBtn.disabled = false;
+                    return;
+                }
+
+                console.log(`DEBUG: Successfully decrypted ${decryptedStudentList.length} records. Failed: ${decryptionFailedCount}`);
+
+                // Success! Switch UI
+                isDirectoryUnlocked = true;
+                elements.dirLockScreen.classList.add('hidden');
+                elements.dirSearchScreen.classList.remove('hidden');
+                elements.dirPassword.value = ''; // Clear sensitive data from UI input
+
+                // Focus Search
+                setTimeout(() => elements.dirSearch.focus(), 100);
+
+            } catch (error) {
+                console.error("Unlock Error:", error);
+                alert("Failed to connect or download database.");
+                elements.dirUnlockBtn.innerHTML = originalBtnText;
+                elements.dirUnlockBtn.disabled = false;
+            }
+        });
+    }
+
+    // 2. Lock Handler (Clears Memory)
+    if (elements.dirLockBtn) {
+        elements.dirLockBtn.addEventListener('click', () => {
+            decryptedStudentList = []; // WIPEOUT MEMORY
+            isDirectoryUnlocked = false;
+
+            elements.dirLockScreen.classList.remove('hidden');
+            elements.dirSearchScreen.classList.add('hidden');
+            elements.dirResults.classList.add('hidden');
+            elements.dirResults.innerHTML = '';
+            elements.dirUnlockBtn.innerHTML = '<i data-lucide="lock-open" class="h-4 w-4 mr-2"></i> Unlock Directory';
+            elements.dirUnlockBtn.disabled = false;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+    }
+
+    // 3. Instant Search (Filter Local Array)
+    if (elements.dirSearch) {
+        elements.dirSearch.addEventListener('input', (e) => {
+            if (!isDirectoryUnlocked) return;
+
+            const term = e.target.value.toLowerCase().trim();
+            const resultsContainer = elements.dirResults;
+
+            if (term.length < 2) {
+                resultsContainer.innerHTML = '';
+                resultsContainer.classList.add('hidden');
+                return;
+            }
+
+            // Filter in memory (Fast!)
+            const matches = decryptedStudentList.filter(s => s._searchStr.includes(term)).slice(0, 10); // Limit to top 10
+
+            resultsContainer.innerHTML = '';
+
+            if (matches.length === 0) {
+                resultsContainer.innerHTML = '<div class="p-3 text-gray-500 text-sm text-center">No matches found.</div>';
+            } else {
+                matches.forEach(student => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg p-3 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors';
+                    card.innerHTML = `
+                        <h4 class="font-bold text-indigo-700 dark:text-indigo-300 text-sm">${student.Name}</h4>
+                        <div class="text-xs text-gray-600 dark:text-gray-400 mt-1 flex justify-between">
+                            <span>${student.RegNo}</span>
+                            <span>${student.Mobile || 'No Phone'}</span>
+                        </div>
+                    `;
+                    // Optional: Click to see more details if needed
+                    resultsContainer.appendChild(card);
+                });
+            }
+            resultsContainer.classList.remove('hidden');
+        });
+    }
+
+    // 4. Manual Search Button (Optional now, but kept for UX)
+    if (elements.dirSearchBtn) {
+        elements.dirSearchBtn.addEventListener('click', () => {
+            elements.dirSearch.dispatchEvent(new Event('input'));
         });
     }
 
