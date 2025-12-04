@@ -413,19 +413,54 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 matches.forEach(student => {
                     const card = document.createElement('div');
-                    card.className = 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg p-3 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors';
+                    // Style updated for solid/white look
+                    card.className = 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group';
                     card.innerHTML = `
-                        <h4 class="font-bold text-indigo-700 dark:text-indigo-300 text-sm">${student.Name}</h4>
-                        <div class="text-xs text-gray-600 dark:text-gray-400 mt-1 flex justify-between">
-                            <span>${student.RegNo}</span>
-                            <span>${student.Mobile || 'No Phone'}</span>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h4 class="font-bold text-gray-900 dark:text-white text-base">${student.Name}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">${student.RegNo}</p>
+                            </div>
+                            <div class="transform transition-transform duration-200 chevron-icon text-gray-400 group-hover:text-indigo-500">
+                                <i data-lucide="chevron-down" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden Details -->
+                        <div class="hidden mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 text-sm space-y-2">
+                            <div class="flex items-center text-gray-700 dark:text-gray-300">
+                                <i data-lucide="mail" class="w-4 h-4 mr-2 text-gray-400"></i>
+                                <span>${student.Mail || 'N/A'}</span>
+                            </div>
+                            <div class="flex items-center text-gray-700 dark:text-gray-300">
+                                <i data-lucide="phone" class="w-4 h-4 mr-2 text-gray-400"></i>
+                                <span>${student.Mobile || 'N/A'}</span>
+                            </div>
                         </div>
                     `;
-                    // Optional: Click to see more details if needed
+
+                    // Add click handler for expansion
+                    card.addEventListener('click', function () {
+                        const details = this.querySelector('.hidden, .block'); // Select either state
+                        const chevron = this.querySelector('.chevron-icon');
+
+                        if (details.classList.contains('hidden')) {
+                            details.classList.remove('hidden');
+                            details.classList.add('block');
+                            chevron.classList.add('rotate-180');
+                        } else {
+                            details.classList.add('hidden');
+                            details.classList.remove('block');
+                            chevron.classList.remove('rotate-180');
+                        }
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                    });
+
                     resultsContainer.appendChild(card);
                 });
             }
             resultsContainer.classList.remove('hidden');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         });
     }
 

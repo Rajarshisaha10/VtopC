@@ -373,15 +373,16 @@
 
                         <!-- Search Screen: Hidden initially -->
                         <div id="dir-search-screen" class="space-y-4 hidden">
+                            <!-- UPDATED: Solid Background for Key Active Indicator -->
                             <div
-                                class="flex justify-between items-center bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-lg border border-green-100 dark:border-green-800">
+                                class="flex justify-between items-center bg-green-100 dark:bg-green-900 px-3 py-2 rounded-lg border border-green-200 dark:border-green-700">
                                 <span
                                     class="text-xs font-mono font-bold text-green-700 dark:text-green-400 flex items-center">
                                     <span class="h-2 w-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
                                     Decryption Key Active
                                 </span>
                                 <button id="dir-lock-btn"
-                                    class="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-300 hover:underline font-medium">
+                                    class="text-xs text-white-500 hover:text-white-700 dark:hover:text-white-300 hover:underline font-medium">
                                     Lock Directory
                                 </button>
                             </div>
@@ -432,7 +433,7 @@
         document.getElementById('current-date-display').textContent = new Date().toLocaleDateString('en-US', dateOptions);
     </script>
     <script src="{{ url_for('static', filename='calculator.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='dashboard.js') }}?v=7"></script>
+    <script type="module" src="{{ url_for('static', filename='dashboard.js') }}?v=8"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
