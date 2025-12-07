@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mycampus-store-v6'; // Incremented version to force update
+const CACHE_NAME = 'mycampus-store-v7';
 
 const ASSETS_TO_CACHE = [
   '/',
