@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mycampus-store-v7';
+const CACHE_NAME = 'mycampus-store-v8';
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -12,14 +12,14 @@ const ASSETS_TO_CACHE = [
   '/static/favicon.ico',
   // Modules
   '/static/modules/constants.js',
-  '/static/modules/data.js',
+  '/static/modules/data_service.js',
   '/static/modules/state.js',
   '/static/modules/ui.js',
   // Helpers
   '/static/calculator.js',
   '/static/solver.js',
   '/static/bitmaps.js',
-  // CRITICAL: Offline Libraries (These were missing before)
+  // CRITICAL: Offline Libraries
   '/static/tailwind.js',
   '/static/lucide.js',
   '/static/alpine.js'
@@ -60,7 +60,6 @@ self.addEventListener('fetch', (e) => {
       fetch(e.request)
         .catch(() => {
           // If network fails (offline), return the cached Dashboard HTML
-          // We map '/' to the dashboard. Even if they were at /profile, serve the shell.
           return caches.match('/');
         })
     );

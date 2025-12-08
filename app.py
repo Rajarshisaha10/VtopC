@@ -32,7 +32,13 @@ def login():
 
 @app.route('/sw.js')
 def service_worker():
-    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    response = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    # Force browser to never cache the Service Worker
+    # This ensures the browser always checks for the latest version
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

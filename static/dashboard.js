@@ -8,6 +8,19 @@ import * as Data from './modules/data_service.js';
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded.");
 
+    // --- NEW: STUCK ON LOADING FAILSAFE ---
+    // If the username still says "Loading..." after 3 seconds, force a reset
+    setTimeout(() => {
+        const userLabel = document.getElementById('sidebar-username');
+        // Check if element exists and text is exactly the default "Loading..."
+        if (userLabel && userLabel.textContent.trim() === 'Loading...') {
+            console.warn("App stuck on loading. Forcing session reset...");
+            localStorage.removeItem('vtop_session_id');
+            window.location.href = '/login';
+        }
+    }, 3000);
+    // --------------------------------------
+
     // State for secure directory
     let decryptedStudentList = []; // Store ALL students here after unlocking
     let isDirectoryUnlocked = false;
