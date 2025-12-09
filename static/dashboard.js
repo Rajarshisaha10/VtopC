@@ -3,23 +3,36 @@ import { state } from './modules/state.js';
 import * as UI from './modules/ui.js';
 import * as Data from './modules/data_service.js';
 
-// Firebase Config moved to dynamic import section
-
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded.");
 
-    // --- NEW: STUCK ON LOADING FAILSAFE ---
-    // If the username still says "Loading..." after 3 seconds, force a reset
+    // ============================================================
+    //  CRITICAL FAILSAFE: STUCK ON LOADING WATCHDOG
+    // ============================================================
+    // If the data is still "Loading..." after 5 seconds, it means the 
+    // VTOP session is dead (expired), even if the backend is alive.
+    // We must force a logout to generate a fresh session.
     setTimeout(() => {
+        const scheduleEl = document.getElementById('today-schedule-container');
+        const snapshotEl = document.getElementById('snapshot-attendance-perc');
         const userLabel = document.getElementById('sidebar-username');
-        // Check if element exists and text is exactly the default "Loading..."
-        if (userLabel && userLabel.textContent.trim() === 'Loading...') {
-            console.warn("App stuck on loading. Forcing session reset...");
+
+        // Check for specific "Loading" indicators
+        const isScheduleStuck = scheduleEl && (scheduleEl.innerText.toLowerCase().includes('loading') || scheduleEl.innerText.trim() === '');
+        const isSnapshotStuck = snapshotEl && snapshotEl.innerText === '...';
+        const isUserStuck = userLabel && userLabel.textContent.trim() === 'Loading...';
+
+        if (isScheduleStuck || isSnapshotStuck || isUserStuck) {
+            console.warn(">> WATCHDOG: App stuck on loading. VTOP session likely expired. Forcing Reset.");
+
+            // 1. Clear Session
             localStorage.removeItem('vtop_session_id');
+
+            // 2. Force Reload/Login
             window.location.href = '/login';
         }
-    }, 3000);
-    // --------------------------------------
+    }, 5000); // 5 Seconds Timeout
+    // ============================================================
 
     // State for secure directory
     let decryptedStudentList = []; // Store ALL students here after unlocking

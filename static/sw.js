@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mycampus-store-v8';
+const CACHE_NAME = 'mycampus-store-v9';
 
 const ASSETS_TO_CACHE = [
   '/',
@@ -12,7 +12,7 @@ const ASSETS_TO_CACHE = [
   '/static/favicon.ico',
   // Modules
   '/static/modules/constants.js',
-  '/static/modules/data_service.js',
+  '/static/modules/data_service.js', // FIXED
   '/static/modules/state.js',
   '/static/modules/ui.js',
   // Helpers
