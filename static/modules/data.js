@@ -9,10 +9,10 @@ import * as UI from './ui.js';
 function getStorageKey(target, params = {}) {
     // Base key using target and semester
     let key = `vtop_cache_${target}_${state.currentSemesterId || 'default'}`;
-    
+
     // Append specific parameters to differentiate (e.g. Calendar months)
     if (params.calDate) key += `_${params.calDate}`;
-    
+
     return key;
 }
 
@@ -23,16 +23,16 @@ function getStorageKey(target, params = {}) {
 function loadFromCache(target, container, params) {
     const cacheKey = getStorageKey(target, params);
     const cachedString = localStorage.getItem(cacheKey);
-    
+
     if (cachedString) {
         try {
             const cachedData = JSON.parse(cachedString);
             console.log(`[Cache] Hit for ${target}`);
-            
+
             if (container) {
                 // Render the cached HTML immediately
                 container.innerHTML = cachedData.html_content;
-                
+
                 // Re-initialize icons since we injected new HTML
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
@@ -44,7 +44,7 @@ function loadFromCache(target, container, params) {
             if (target === TARGETS.TIMETABLE && cachedData.raw_data) {
                 state.setTimetable(cachedData.raw_data.timetable);
             }
-            
+
             return true;
         } catch (e) {
             console.error("[Cache] Parse error", e);
@@ -68,7 +68,7 @@ function handleFetchError(error, container, target, params) {
 
     if (isContentVisible) {
         console.log('[Network] keeping cached data visible.');
-        
+
         if (error.message.includes("Session expired")) {
             localStorage.removeItem('vtop_session_id');
             window.location.href = '/login';
@@ -117,7 +117,7 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
                 <i data-lucide="loader" class="animate-spin h-8 w-8 text-indigo-600 mb-3"></i>
                 <p class="text-sm text-gray-500">Loading ${title || 'content'}...</p>
             </div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons(); 
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // STEP 3: Check Online Status
@@ -125,43 +125,43 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         if (!hasCachedData) {
             containerElement.innerHTML = `<div class="p-6 text-center"><p class="text-gray-500">No data available offline.</p></div>`;
         }
-        return; 
+        return;
     }
 
     // STEP 4: Network Fetch (Background Refresh)
     try {
         const currentSessionId = localStorage.getItem('vtop_session_id');
-        const payload = { 
-            session_id: currentSessionId, 
-            target: target, 
-            semesterSubId: state.currentSemesterId, 
-            ...extraParams 
+        const payload = {
+            session_id: currentSessionId,
+            target: target,
+            semesterSubId: state.currentSemesterId,
+            ...extraParams
         };
-        
-        const response = await fetch(`${API_BASE_URL}/fetch-data`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify(payload) 
+
+        const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
-        
+
         if (!response.ok) {
-             if(response.status === 401) throw new Error("Session expired.");
-             throw new Error(`Server error ${response.status}`);
+            if (response.status === 401) throw new Error("Session expired.");
+            throw new Error(`Server error ${response.status}`);
         }
 
         const data = await response.json();
-        
-        if (data.status === 'success') { 
+
+        if (data.status === 'success') {
             // --- CRITICAL FIX START: Handle Auto-Semester Switch ---
             if (data.new_semester_id && data.new_semester_id !== state.currentSemesterId) {
                 console.log(`[Data] Auto-switching semester to ${data.new_semester_id}`);
-                
+
                 // 1. Update Internal State
                 state.setSemesterId(data.new_semester_id);
-                
+
                 // 2. Persist to Storage
                 localStorage.setItem('vtop_semester_id', data.new_semester_id);
-                
+
                 // 3. Update UI Dropdown (Visual Sync)
                 const semSelect = document.getElementById('semester-select');
                 if (semSelect) {
@@ -171,26 +171,26 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
             // --- CRITICAL FIX END ---
 
             // A. Update UI with fresh data
-            containerElement.innerHTML = data.html_content; 
-            if (typeof lucide !== 'undefined') lucide.createIcons(); 
-            
+            containerElement.innerHTML = data.html_content;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
             // B. Update Runtime State
             if (target === TARGETS.ATTENDANCE) state.setAttendance(data.raw_data);
             if (target === TARGETS.TIMETABLE) state.setTimetable(data.raw_data.timetable);
-            
+
             // C. Save to Persistent Cache
             // Note: We do this AFTER updating state.currentSemesterId so the key is correct
             try {
                 localStorage.setItem(getStorageKey(target, extraParams), JSON.stringify(data));
                 console.log(`[Cache] Updated ${target}`);
-            } catch(e) { console.warn("Cache save failed", e); }
+            } catch (e) { console.warn("Cache save failed", e); }
 
         } else {
             throw new Error(data.message);
         }
 
-    } catch (error) { 
-        handleFetchError(error, containerElement, target, extraParams); 
+    } catch (error) {
+        handleFetchError(error, containerElement, target, extraParams);
     }
 }
 
@@ -199,19 +199,19 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
 export async function fetchAttendanceForCache() {
     const target = TARGETS.ATTENDANCE;
     const c = localStorage.getItem(getStorageKey(target));
-    if(c) state.setAttendance(JSON.parse(c).raw_data);
+    if (c) state.setAttendance(JSON.parse(c).raw_data);
 
-    if(!navigator.onLine) return;
+    if (!navigator.onLine) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/fetch-data`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ 
-                session_id: localStorage.getItem('vtop_session_id'), 
-                target: target, 
-                semesterSubId: state.currentSemesterId 
-            }) 
+        const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: localStorage.getItem('vtop_session_id'),
+                target: target,
+                semesterSubId: state.currentSemesterId
+            })
         });
         const data = await response.json();
         if (data.status === 'success') {
@@ -223,21 +223,21 @@ export async function fetchAttendanceForCache() {
 }
 
 export async function fetchTimetableForCache() {
-     const target = TARGETS.TIMETABLE;
-     const c = localStorage.getItem(getStorageKey(target));
-     if(c) state.setTimetable(JSON.parse(c).raw_data.timetable);
+    const target = TARGETS.TIMETABLE;
+    const c = localStorage.getItem(getStorageKey(target));
+    if (c) state.setTimetable(JSON.parse(c).raw_data.timetable);
 
-     if(!navigator.onLine) return;
+    if (!navigator.onLine) return;
 
-     try {
-        const response = await fetch(`${API_BASE_URL}/fetch-data`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ 
-                session_id: localStorage.getItem('vtop_session_id'), 
-                target: target, 
-                semesterSubId: state.currentSemesterId 
-            }) 
+    try {
+        const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: localStorage.getItem('vtop_session_id'),
+                target: target,
+                semesterSubId: state.currentSemesterId
+            })
         });
         const data = await response.json();
         if (data.status === 'success') {
@@ -245,11 +245,11 @@ export async function fetchTimetableForCache() {
             localStorage.setItem(getStorageKey(target), JSON.stringify(data));
             console.log('[Cache] Pre-fetched Timetable');
         }
-     } catch (e) { console.warn(e); }
+    } catch (e) { console.warn(e); }
 }
 
 export async function fetchAndCalculateAttendanceSnapshot() {
-    if (!state.currentSemesterId) return; 
+    if (!state.currentSemesterId) return;
     const target = TARGETS.ATTENDANCE;
 
     const updateWidget = (rawData) => {
@@ -261,28 +261,28 @@ export async function fetchAndCalculateAttendanceSnapshot() {
     const c = localStorage.getItem(getStorageKey(target));
     if (c) {
         updateWidget(JSON.parse(c).raw_data);
-    } else { 
-        const el = document.getElementById('snapshot-attendance-perc'); 
-        if(el) el.textContent = '...'; 
+    } else {
+        const el = document.getElementById('snapshot-attendance-perc');
+        if (el) el.textContent = '...';
     }
 
     if (!navigator.onLine) return;
 
     // 2. Network
     try {
-        const response = await fetch(`${API_BASE_URL}/fetch-data`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ 
-                session_id: localStorage.getItem('vtop_session_id'), 
-                target: target, 
-                semesterSubId: state.currentSemesterId 
-            }) 
+        const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: localStorage.getItem('vtop_session_id'),
+                target: target,
+                semesterSubId: state.currentSemesterId
+            })
         });
         const data = await response.json();
         if (data.status === 'success' && data.raw_data) {
             updateWidget(data.raw_data);
-            localStorage.setItem(getStorageKey(target), JSON.stringify(data)); 
+            localStorage.setItem(getStorageKey(target), JSON.stringify(data));
         }
     } catch (error) { console.error("Snapshot fetch failed", error); }
 }
@@ -290,30 +290,30 @@ export async function fetchAndCalculateAttendanceSnapshot() {
 export async function fetchTimetableAndCourses(coursesContainer, timetableContainer, todayScheduleContainer) {
     if (!state.currentSemesterId) return;
     const target = TARGETS.TIMETABLE;
-    
+
     const renderData = (data) => {
         state.setTimetable(data.raw_data.timetable);
-        
+
         if (coursesContainer || timetableContainer) {
-             const parser = new DOMParser();
-             const doc = parser.parseFromString(data.html_content, 'text/html');
-             const coursesContent = doc.getElementById('registered-courses-content');
-             const timetableContent = doc.getElementById('weekly-timetable-content');
-             
-             if (coursesContainer) { 
-                 coursesContainer.innerHTML = ''; 
-                 if (coursesContent) coursesContainer.appendChild(coursesContent); 
-             }
-             if (timetableContainer) { 
-                 timetableContainer.innerHTML = ''; 
-                 if (timetableContent) timetableContainer.appendChild(timetableContent); 
-             }
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(data.html_content, 'text/html');
+            const coursesContent = doc.getElementById('registered-courses-content');
+            const timetableContent = doc.getElementById('weekly-timetable-content');
+
+            if (coursesContainer) {
+                coursesContainer.innerHTML = '';
+                if (coursesContent) coursesContainer.appendChild(coursesContent);
+            }
+            if (timetableContainer) {
+                timetableContainer.innerHTML = '';
+                if (timetableContent) timetableContainer.appendChild(timetableContent);
+            }
         }
 
         if (todayScheduleContainer) {
             UI.populateTodaySchedule(data.raw_data.timetable, todayScheduleContainer);
         }
-        
+
         if (typeof lucide !== 'undefined') lucide.createIcons();
     };
 
@@ -328,20 +328,20 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
             console.log('[Cache] Loaded Timetable/Courses data.');
             renderData(cachedData);
             hasCache = true;
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     }
 
     // 2. Check Online
     if (!navigator.onLine) {
-         if (!hasCache && todayScheduleContainer) {
-             todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">No offline data.</p>';
-         }
-         return;
+        if (!hasCache && todayScheduleContainer) {
+            todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">No offline data.</p>';
+        }
+        return;
     }
 
     // 3. Loading UI
     const loadingHTML = `<div class="p-8 text-center text-gray-500 flex flex-col items-center justify-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Loading data...</p></div>`;
-    
+
     if (!hasCache) {
         if (coursesContainer) coursesContainer.innerHTML = loadingHTML;
         if (timetableContainer) timetableContainer.innerHTML = loadingHTML;
@@ -351,21 +351,22 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
 
     // 4. Network Fetch
     try {
-        const response = await fetch(`${API_BASE_URL}/fetch-data`, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ 
-                session_id: localStorage.getItem('vtop_session_id'), 
-                target: target, 
-                semesterSubId: state.currentSemesterId 
-            }) 
+        const response = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: localStorage.getItem('vtop_session_id'),
+                target: target,
+                semesterSubId: state.currentSemesterId,
+                includeDayOrder: !!timetableContainer // Request day order check ONLY if showing full timetable
+            })
         });
         const data = await response.json();
         if (data.status === 'success') {
-            renderData(data); 
-            localStorage.setItem(cacheKey, JSON.stringify(data)); 
+            renderData(data);
+            localStorage.setItem(cacheKey, JSON.stringify(data));
         } else throw new Error(data.message);
-    } catch (error) { 
+    } catch (error) {
         console.error(error);
         if (!hasCache) handleFetchError(error, timetableContainer || coursesContainer, target, {});
     }
@@ -380,7 +381,7 @@ export async function fetchAndDisplayODSnapshot() {
         try {
             const cachedData = JSON.parse(cachedString);
             UI.updateODSnapshot(cachedData);
-        } catch(e) { console.error(e); }
+        } catch (e) { console.error(e); }
     } else {
         const el = document.getElementById('snapshot-od-count');
         if (el) el.textContent = '... / 40';

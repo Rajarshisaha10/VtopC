@@ -51,6 +51,7 @@ def fetch_timetable(ctx, data):
     is_saturday = datetime.datetime.now().weekday() == 5
     
     if is_saturday or include_day_order:
+        print(f"Checking Day Order: Saturday={is_saturday}, ExplicitRequest={include_day_order}")
         now = datetime.datetime.now()
         days_offset = 5 - now.weekday()
         target_saturday = now + datetime.timedelta(days=days_offset)
