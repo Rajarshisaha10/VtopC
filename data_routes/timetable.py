@@ -48,7 +48,8 @@ def fetch_timetable(ctx, data):
     parsed_data = parse_course_data(res.text)
 
     # 2. Day Order Patch
-    is_saturday = datetime.datetime.now().weekday() == 5
+    is_saturday = data.get('isSaturday', False)
+    print(f"[Debug] fetch_timetable called. isSaturday from client: {is_saturday}, Raw Data: {data}")
     
     if is_saturday or include_day_order:
         print(f"Checking Day Order: Saturday={is_saturday}, ExplicitRequest={include_day_order}")
@@ -73,6 +74,7 @@ def fetch_timetable(ctx, data):
                 for day_obj in cal_data['days']:
                     if day_obj['day'] == target_saturday.day:
                         day_order_code = get_day_order(day_obj.get('events', []))
+                        print(f"[Debug] Saturday {target_saturday} Day Order: {day_order_code}")
                         if day_order_code and day_order_code in parsed_data['timetable']:
                             parsed_data['timetable']['SAT'] = parsed_data['timetable'][day_order_code].copy()
                             parsed_data['day_order_active'] = day_order_code

@@ -1,7 +1,7 @@
 import { API_BASE_URL, TARGETS } from './modules/constants.js';
 import { state } from './modules/state.js';
 import * as UI from './modules/ui.js';
-import * as Data from './modules/data.js';
+import * as Data from './modules/data_service.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded.");

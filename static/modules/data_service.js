@@ -236,7 +236,8 @@ export async function fetchTimetableForCache() {
             body: JSON.stringify({
                 session_id: localStorage.getItem('vtop_session_id'),
                 target: target,
-                semesterSubId: state.currentSemesterId
+                semesterSubId: state.currentSemesterId,
+                isSaturday: new Date().getDay() === 6 // Check client-side time
             })
         });
         const data = await response.json();
@@ -351,15 +352,20 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
 
     // 4. Network Fetch
     try {
+        const payload = {
+            session_id: localStorage.getItem('vtop_session_id'),
+            target: target,
+            semesterSubId: state.currentSemesterId,
+            includeDayOrder: !!timetableContainer, // Request day order check ONLY if showing full timetable
+            isSaturday: new Date().getDay() === 6 // Check client-side time
+        };
+        console.log("[Debug] Fetching data with payload:", payload);
+        console.log("[Debug] Client-side isSaturday:", payload.isSaturday, "Day:", new Date().getDay());
+
         const response = await fetch(`${API_BASE_URL}/fetch-data`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                session_id: localStorage.getItem('vtop_session_id'),
-                target: target,
-                semesterSubId: state.currentSemesterId,
-                includeDayOrder: !!timetableContainer // Request day order check ONLY if showing full timetable
-            })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
         if (data.status === 'success') {
