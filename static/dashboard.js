@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. Force Reload/Login
             window.location.href = '/login';
         }
-    }, 1000); // 5 Seconds Timeout
+    }, 100); // 5 Seconds Timeout
     // ============================================================
 
     // State for secure directory
@@ -636,3 +636,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 });
+
