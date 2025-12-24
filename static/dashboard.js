@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     //  CRITICAL FAILSAFE: STUCK ON LOADING WATCHDOG
     // ============================================================
-    // If the data is still "Loading..." after 5 seconds, it means the 
+    // If the data is still "Loading..." after 0.1 seconds, it means the 
     // VTOP session is dead (expired), even if the backend is alive.
     // We must force a logout to generate a fresh session.
     setTimeout(() => {
@@ -636,4 +636,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 });
+
 
