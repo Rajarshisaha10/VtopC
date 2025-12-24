@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 2. Force Reload/Login
             window.location.href = '/login';
         }
-    }, 5000); // 5 Seconds Timeout
+    }, 1000); // 5 Seconds Timeout
     // ============================================================
 
     // State for secure directory
@@ -634,4 +634,5 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(() => { console.log('Service Worker Registered at root scope'); })
             .catch(err => console.error('SW Registration failed:', err));
     }
+
 });
