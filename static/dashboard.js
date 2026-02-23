@@ -2,13 +2,12 @@ import { API_BASE_URL, TARGETS } from './modules/constants.js';
 import { state } from './modules/state.js';
 import * as UI from './modules/ui.js';
 import * as Data from './modules/data_service.js';
+import { initRoommateChat } from './modules/chat.js'; // Added Import
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Dashboard module loaded. Version: Background Session Sync");
+    console.log("Dashboard module loaded. Version: Modular Secure Chat");
 
-    // ============================================================
-    //  CRITICAL FAILSAFE: STUCK ON LOADING WATCHDOG
-    // ============================================================
+    // Watchdog for slow loads
     setTimeout(() => {
         const scheduleEl = document.getElementById('today-schedule-container');
         const snapshotEl = document.getElementById('snapshot-attendance-perc');
@@ -22,16 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
             console.warn(">> WATCHDOG: App taking long to load. Ensure network connects.");
         }
     }, 10000); 
-    // ============================================================
 
-    // State for secure directory
+    // Directory State
     let decryptedStudentList = [];
     let isDirectoryUnlocked = false;
-
-    // Chat State
-    let supabaseClient = null;
-    let currentChatRoomId = null;
-    let chatSubscription = null;
 
     const elements = {
         menuToggle: document.getElementById('menu-toggle'),
@@ -108,8 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function refreshCurrentPage() {
         try {
-            console.log("Refreshing current page view...");
-            
             if (UI && typeof UI.clearAllDataContainers === 'function') {
                 UI.clearAllDataContainers(allDataContainers);
             } else {
@@ -127,8 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             .then(() => { if (typeof Data.fetchAndCalculateAttendanceSnapshot === 'function') return Data.fetchAndCalculateAttendanceSnapshot(); })
                             .then(() => { if (typeof Data.fetchAndDisplayODSnapshot === 'function') return Data.fetchAndDisplayODSnapshot(); })
                             .catch(err => console.error("Dashboard Fetch Chain Failed:", err));
-                    } else {
-                        if (elements.todaySchedule) elements.todaySchedule.innerHTML = '<p class="text-red-500 text-sm p-4 text-center">Module load failed. Please press Ctrl+F5.</p>';
                     }
                 } else if (sectionId === 'enrollment' && elements.enrollment) {
                     if (Data && typeof Data.fetchAndDisplay === 'function') Data.fetchAndDisplay(TARGETS.ENROLLMENT, elements.enrollment, "Course Enrollment");
@@ -139,13 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const activeSub = document.querySelector('.nav-link-child.active-subsection');
                 if (activeSub) activeSub.click();
             }
-        } catch (error) {
-            console.error("FATAL ERROR in refreshCurrentPage:", error);
-            if (elements.todaySchedule) elements.todaySchedule.innerHTML = `<p class="text-red-500 text-sm p-4">Client error: ${error.message}</p>`;
-        }
+        } catch (error) {}
     }
 
-    // Modal Events
     document.body.addEventListener('click', (e) => {
         const btn = e.target.closest('.view-attendance-detail');
         if (btn) {
@@ -174,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (link) link.click();
     });
 
-    // Main Navigation Links Handler
     elements.navLinks.forEach(link => {
         if (['academics', 'examinations', 'extra'].includes(link.dataset.section)) return;
         link.addEventListener('click', async (e) => {
@@ -199,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                 }
-                initRoommateChat();
+                initRoommateChat(); // Clean call to our new modular logic
             }
 
             closeSidebar();
@@ -215,11 +199,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (UI && UI.showPageSection) UI.showPageSection(parentId, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
             if (UI && UI.showSubsection) UI.showSubsection(parentId, subsectionId, elements.navLinkChildren);
-
-            if (!Data || typeof Data.fetchTimetableAndCourses !== 'function') {
-                console.error("Data Service Module is incomplete.");
-                return;
-            }
 
             if (subsectionId === 'extra-calculator') {
                 elements.calculator.innerHTML = '<div class="p-8 text-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-2"></i><p class="text-gray-500">Opening calculator...</p></div>';
@@ -331,48 +310,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     projectId: "vitc29",
                     storageBucket: "vitc29.firebasestorage.app",
                     messagingSenderId: "376204861458",
-                    appId: "1:376204861458:web:5dc7fdaa74f2650911f8cb",
-                    measurementId: "G-733GMSBTQQ"
+                    appId: "1:376204861458:web:5dc7fdaa74f2650911f8cb"
                 };
 
                 const app = initializeApp(firebaseConfig);
                 const db = getFirestore(app);
 
-                let querySnapshot;
-                try {
-                    querySnapshot = await getDocs(collection(db, "encrypted_students"));
-                } catch (fetchError) {
-                    throw new Error("Database Unreachable.");
-                }
-
+                let querySnapshot = await getDocs(collection(db, "encrypted_students"));
                 decryptedStudentList = [];
-                let decryptionFailedCount = 0;
                 let successCount = 0;
-
-                if (querySnapshot.size === 0) {
-                    alert("Database is empty.");
-                    elements.dirUnlockBtn.innerHTML = originalBtnText;
-                    elements.dirUnlockBtn.disabled = false;
-                    return;
-                }
 
                 querySnapshot.forEach((doc) => {
                     try {
                         const data = doc.data();
                         const decrypted = CryptoJS.AES.decrypt(data.blob, key, { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 });
                         const jsonString = decrypted.toString(CryptoJS.enc.Utf8);
-
                         if (jsonString && jsonString.startsWith('{')) {
                             const student = JSON.parse(jsonString);
                             student._searchStr = `${student.Name} ${student.RegNo} ${student.Mail} ${student.Mobile}`.toLowerCase();
                             decryptedStudentList.push(student);
                             successCount++;
-                        } else {
-                            decryptionFailedCount++;
                         }
-                    } catch (e) {
-                        decryptionFailedCount++;
-                    }
+                    } catch (e) { }
                 });
 
                 if (successCount === 0) {
@@ -387,7 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.dirSearchScreen.classList.remove('hidden');
                 elements.dirPassword.value = '';
                 setTimeout(() => elements.dirSearch.focus(), 100);
-
             } catch (error) {
                 alert(error.message || "Failed to connect database.");
                 elements.dirUnlockBtn.innerHTML = originalBtnText;
@@ -475,345 +433,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (elements.dirSearchBtn) {
-        elements.dirSearchBtn.addEventListener('click', () => {
-            elements.dirSearch.dispatchEvent(new Event('input'));
-        });
-    }
-
-    // --- Roommate Chat Specific Logic ---
-    async function initRoommateChat() {
-        const chatUI = {
-            messages: document.getElementById('chat-messages'),
-            input: document.getElementById('chat-input'),
-            sendBtn: document.getElementById('send-chat-btn'),
-            title: document.getElementById('chat-room-title'),
-            subtitle: document.getElementById('chat-room-subtitle'),
-            fileInput: document.getElementById('chat-file-input'),
-            fileIndicator: document.getElementById('chat-file-indicator'),
-            fileName: document.getElementById('chat-file-name'),
-            fileRemoveBtn: document.getElementById('chat-file-remove')
-        };
-
-        if (!chatUI.messages) return;
-
-        chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-400"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Locating your room...</p></div>';
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        // Check config before doing anything
-        if (!window.SUPABASE_CONFIG || !window.SUPABASE_CONFIG.url || !window.SUPABASE_CONFIG.key) {
-            chatUI.messages.innerHTML = '<div class="p-10 text-center text-red-500 text-sm">Chat is disabled: Supabase configuration is missing in environment.</div>';
-            return;
-        }
-
-        try {
-            // Safely get profile data (direct fetch if cached is missing to prevent UI overlap)
-            let profileData = state.cachedProfile;
-            if (!profileData) {
-                try {
-                    const res = await fetch(`${API_BASE_URL}/get-profile`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id') })
-                    });
-                    const d = await res.json();
-                    if (d.status === 'success') {
-                        profileData = d.data || d.profile || d;
-                        state.cachedProfile = profileData;
-                    }
-                } catch(e) { console.error("Chat Profile Fetch:", e); }
-            }
-            
-            profileData = profileData || {};
-            const personal = profileData.personal || {};
-
-            // Extract Registration Number accurately
-            let myRegNo = personal?.registerNumber || profileData?.registerNumber || personal?.app_no;
-            
-            // Further fallback if it's missing (sometimes nested in flat arrays)
-            if (!myRegNo && Array.isArray(profileData.personal)) {
-                const flat = profileData.personal.flat(Infinity);
-                for (let i = 0; i < flat.length; i++) {
-                    const val = String(flat[i]).toLowerCase();
-                    if ((val.includes('register') || val.includes('reg no')) && i + 1 < flat.length) {
-                        myRegNo = flat[i + 1];
-                        break;
-                    }
-                }
-            }
-            myRegNo = myRegNo || 'Campus User';
-
-            let roomTitle, roomSub, roomId;
-
-            // --- SMART HOSTEL DATA EXTRACTION ---
-            let hBlock = null;
-            let hRoom = null;
-            
-            if (profileData.hostel) {
-                const hData = profileData.hostel;
-                
-                // 1. Direct object matching
-                if (typeof hData === 'object' && !Array.isArray(hData)) {
-                    hBlock = hData['Block'] || hData.block || hData.Block;
-                    hRoom = hData['Room No'] || hData.room || hData.Room;
-                } 
-                
-                // 2. Key-Value List matching (e.g. flat list: ["Block", "D1...", "Room No", "1129"])
-                if (!hBlock && !hRoom && Array.isArray(hData)) {
-                    const flat = hData.flat(Infinity);
-                    for (let i = 0; i < flat.length; i++) {
-                        const val = String(flat[i]).trim();
-                        if (val.toLowerCase() === 'block' && i + 1 < flat.length) hBlock = flat[i + 1];
-                        if (val.toLowerCase() === 'room no' && i + 1 < flat.length) hRoom = flat[i + 1];
-                    }
-                }
-                
-                // 3. User described structure: [ "D1 Block Mens...", ["1129"] ]
-                if (!hBlock && !hRoom && Array.isArray(hData) && hData.length >= 2) {
-                    if (typeof hData[0] === 'string') hBlock = hData[0];
-                    if (Array.isArray(hData[1])) hRoom = String(hData[1][0]);
-                    else hRoom = String(hData[1]);
-                }
-            }
-            
-            // Clean up block name (e.g. "D1 Block Mens Hostel (D1 - Block )" -> "D1")
-            if (hBlock && typeof hBlock === 'string') {
-                const match = hBlock.match(/\((.*?)\)/);
-                if (match) {
-                    hBlock = match[1].replace(/-\s*Block/i, '').trim(); 
-                } else {
-                    hBlock = hBlock.split(' ')[0]; // E.g., "D1" from "D1 Block Mens..."
-                }
-            }
-            if (hRoom) {
-                hRoom = String(hRoom).trim();
-            }
-            // ------------------------------------
-
-            // If hostel info exists, use Roommate Chat. Otherwise, gracefully fallback to Global Chat.
-            if (hBlock && hRoom) {
-                roomId = `${hBlock}-${hRoom}`.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toUpperCase();
-                roomTitle = `Room ${hRoom}`;
-                roomSub = `Block ${hBlock}`;
-            } else {
-                roomId = 'CAMPUS-LOUNGE';
-                roomTitle = 'Campus Lounge';
-                roomSub = 'Global Community Chat';
-            }
-
-            currentChatRoomId = roomId;
-            chatUI.title.textContent = roomTitle;
-            chatUI.subtitle.textContent = roomSub;
-
-            if (!supabaseClient) {
-                supabaseClient = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.key);
-            }
-
-            // Clean up any existing subscription if user navigated away and back
-            if (chatSubscription) chatSubscription.unsubscribe();
-
-            // Fetch recent message history
-            const { data: messages, error } = await supabaseClient
-                .from('messages')
-                .select('*')
-                .eq('room_id', roomId)
-                .order('created_at', { ascending: true })
-                .limit(50);
-                
-            if (error) throw error;
-
-            chatUI.messages.innerHTML = '';
-            if (messages && messages.length > 0) {
-                messages.forEach(msg => appendMessageUI(msg, myRegNo, chatUI.messages));
-            } else {
-                chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full opacity-50"><i data-lucide="messages-square" class="w-12 h-12 mb-3 text-gray-400"></i><p class="italic text-sm text-gray-500">No messages yet. Say hi to your roommates!</p></div>';
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-            }
-
-            // Subscribe to real-time incoming messages for this specific room
-            chatSubscription = supabaseClient
-                .channel(`room-${roomId}`)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, 
-                payload => appendMessageUI(payload.new, myRegNo, chatUI.messages))
-                .subscribe();
-
-            // Attach UI Event Listeners
-            chatUI.sendBtn.onclick = () => handleSendMessage(chatUI, myRegNo);
-            
-            chatUI.input.onkeydown = (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage(chatUI, myRegNo);
-                }
-            };
-            
-            // Handle File Input UI updates
-            chatUI.fileInput.onchange = () => {
-                const file = chatUI.fileInput.files[0];
-                if (file) {
-                    chatUI.fileIndicator.classList.remove('hidden');
-                    chatUI.fileName.textContent = file.name;
-                    chatUI.input.focus();
-                } else {
-                    chatUI.fileIndicator.classList.add('hidden');
-                }
-            };
-
-            // Remove File Button
-            if (chatUI.fileRemoveBtn) {
-                chatUI.fileRemoveBtn.onclick = (e) => {
-                    e.preventDefault();
-                    chatUI.fileInput.value = '';
-                    chatUI.fileIndicator.classList.add('hidden');
-                };
-            }
-
-            setTimeout(() => chatUI.input.focus(), 100);
-
-        } catch (err) {
-            console.error("Chat Init Error:", err);
-            chatUI.messages.innerHTML = '<div class="p-10 flex flex-col items-center text-center"><i data-lucide="wifi-off" class="w-10 h-10 text-red-400 mb-3"></i><p class="text-red-500 font-medium">Connection error</p><p class="text-sm text-gray-500 mt-1">Failed to connect to the secure chat server. ' + (err.message || '') + '</p></div>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
-    }
-
-    async function handleSendMessage(ui, myRegNo) {
-        const content = ui.input.value.trim();
-        const file = ui.fileInput.files[0];
-        
-        // Prevent empty sends
-        if (!content && !file) return;
-
-        // UI Loading state
-        ui.sendBtn.disabled = true;
-        const originalBtnHTML = ui.sendBtn.innerHTML;
-        ui.sendBtn.innerHTML = '<i data-lucide="loader" class="animate-spin w-5 h-5"></i>';
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        try {
-            let fileUrl = null;
-            
-            // 1. Upload file if it exists
-            if (file) {
-                const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
-                const { data, error } = await supabaseClient.storage
-                    .from('chat-attachments')
-                    .upload(`${currentChatRoomId}/${safeFileName}`, file);
-                
-                if (error) {
-                    throw new Error("Storage Error: " + error.message + " (Did you create the 'chat-attachments' bucket?)");
-                }
-                
-                if (data) {
-                    const { data: urlData } = supabaseClient.storage
-                        .from('chat-attachments')
-                        .getPublicUrl(`${currentChatRoomId}/${safeFileName}`);
-                    fileUrl = urlData.publicUrl;
-                }
-            }
-
-            // 2. Prepare Payload dynamically (only include file_url if a file was uploaded)
-            const payload = {
-                room_id: currentChatRoomId,
-                user_id: String(myRegNo),
-                user_name: String(myRegNo),
-                content: content
-            };
-
-            if (fileUrl) {
-                payload.file_url = fileUrl;
-            }
-
-            // 3. Insert Message into Database
-            const { error: msgError } = await supabaseClient.from('messages').insert([payload]);
-
-            if (msgError) {
-                console.error("Supabase Database Error Details:", msgError);
-                throw new Error("DB Error: " + (msgError.message || msgError.details || JSON.stringify(msgError)));
-            }
-
-            // 4. Clear Inputs on Success
-            ui.input.value = '';
-            ui.input.style.height = 'auto'; // Reset auto-grow
-            ui.fileInput.value = '';
-            ui.fileIndicator.classList.add('hidden');
-            
-        } catch (e) {
-            console.error("Failed to send message:", e);
-            // This alert will now explicitly tell you what Supabase is rejecting!
-            alert(e.message || "Failed to send message. Please check your connection.");
-        } finally {
-            // Restore UI state
-            ui.sendBtn.disabled = false;
-            ui.sendBtn.innerHTML = originalBtnHTML;
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-            ui.input.focus();
-        }
-    }
-
-    function appendMessageUI(msg, myRegNo, container) {
-        if (!container) return;
-
-        // Remove the "No messages yet" placeholder if it exists
-        const emptyState = container.querySelector('.opacity-50');
-        if (emptyState) emptyState.remove();
-
-        const isMe = msg.user_id === myRegNo;
-        const div = document.createElement('div');
-        div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in-up mb-4`;
-        
-        // Extract filename from URL if it's not provided in the DB row directly
-        let displayFileName = msg.file_name || 'Attached Document';
-        if (msg.file_url && !msg.file_name) {
-            try {
-                const urlParts = msg.file_url.split('/');
-                displayFileName = decodeURIComponent(urlParts[urlParts.length - 1].split('_').slice(1).join('_')) || 'Attached Document';
-            } catch(e) {}
-        }
-        
-        div.innerHTML = `
-            <div class="max-w-[85%] sm:max-w-[75%] flex flex-col ${isMe ? 'items-end' : 'items-start'}">
-                <div class="${isMe ? 'bg-indigo-600 text-white rounded-l-2xl rounded-tr-2xl' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-100 dark:border-gray-700 rounded-r-2xl rounded-tl-2xl'} p-3 shadow-sm transition-all break-words w-full">
-                    
-                    ${!isMe ? `<p class="text-[11px] font-bold text-indigo-500 dark:text-indigo-400 mb-1 tracking-wide">${msg.user_name}</p>` : ''}
-                    
-                    ${msg.content ? `<p class="text-sm leading-relaxed whitespace-pre-wrap">${msg.content}</p>` : ''}
-                    
-                    ${msg.file_url ? `
-                        <a href="${msg.file_url}" target="_blank" rel="noopener noreferrer" 
-                           class="${msg.content ? 'mt-3' : ''} flex items-center p-2.5 ${isMe ? 'bg-indigo-700 hover:bg-indigo-800 border-indigo-500' : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600'} rounded-xl text-xs transition-colors border group">
-                            <div class="${isMe ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-600 dark:bg-gray-800 dark:text-indigo-400'} p-2 rounded-lg mr-3 shrink-0">
-                                <i data-lucide="file" class="w-4 h-4"></i>
-                            </div>
-                            <span class="truncate font-medium flex-1 mr-2">${displayFileName}</span>
-                            <i data-lucide="download" class="w-4 h-4 opacity-50 group-hover:opacity-100 shrink-0"></i>
-                        </a>
-                    ` : ''}
-                </div>
-                <p class="text-[10px] mt-1.5 opacity-50 font-medium px-1 flex items-center">
-                    ${new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-            </div>
-        `;
-        
-        container.appendChild(div);
-        
-        // Auto scroll to bottom
-        container.scrollTo({
-            top: container.scrollHeight,
-            behavior: 'smooth'
-        });
-        
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
     // ============================================================
-    // --- System Init & Checks: Corrected Order of Operations ---
+    // --- System Init & Checks ---
     // ============================================================
     
-    // Step 1: Immediately render the dashboard from local cache
     function loadCachedData() {
-        console.log("Loading cached data for immediate display...");
         const cachedName = localStorage.getItem('vtop_username_cache');
         const cachedRegNo = localStorage.getItem('vtop_regno_cache');
 
@@ -828,25 +452,18 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.semesterSelect.innerHTML = `<option disabled>No semester saved</option>`;
         }
         
-        // Render the current view immediately using existing cached state
         refreshCurrentPage();
     }
 
-    // Step 2: Validate the session in the background and fetch fresh data if valid
     async function checkSessionAndFetchLatest() {
-        console.log("Checking session status in background...");
         const savedSessionId = localStorage.getItem('vtop_session_id');
         
         if (!savedSessionId) { 
-            // Step 3 (No Session): Redirect to login to create a new session
             window.location.href = '/login'; 
             return; 
         }
 
-        if (!navigator.onLine) { 
-            console.log("App is offline. Relying strictly on cached data.");
-            return; 
-        }
+        if (!navigator.onLine) { return; }
 
         try {
             const response = await fetch(`${API_BASE_URL}/check-session`, { 
@@ -859,7 +476,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             if (data.status === 'success') {
-                // Step 3 (Valid Session): Update UI and fetch the latest fresh data
                 const userName = data.username || localStorage.getItem('vtop_username_cache') || 'User';
                 const regStatus = 'Session Active';
 
@@ -869,22 +485,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('vtop_username_cache', userName);
                 localStorage.setItem('vtop_regno_cache', regStatus);
 
-                await populateSemesterDropdown(true); // pass true to indicate a network refresh is needed
+                await populateSemesterDropdown(true); 
             } else {
-                // Step 3 (Expired Session): Dump the bad session and force the user to login to fetch new data
-                console.warn("Session expired or invalid. Redirecting to login to load a new session...");
                 localStorage.removeItem('vtop_session_id');
                 window.location.href = '/login';
             }
         } catch (error) {
-            console.warn("Session check failed (network issue?). Staying in offline mode.", error);
             if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = 'Offline Mode';
         }
     }
 
-    // Support function for fetching semesters and kicking off the latest data refresh
     async function populateSemesterDropdown(triggerRefresh = false) {
-        console.log("Fetching semesters from network...");
         try {
             const response = await fetch(`${API_BASE_URL}/get-semesters`, { 
                 method: 'POST', 
@@ -898,7 +509,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const savedSemId = localStorage.getItem('vtop_semester_id');
                 let selectedId = data.semesters[0].id;
                 
-                // Keep the saved sem if it exists in the fetched list
                 if (savedSemId && data.semesters.some(s => s.id === savedSemId)) {
                     selectedId = savedSemId;
                 }
@@ -913,23 +523,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if(state && state.setSemesterId) state.setSemesterId(selectedId);
                 localStorage.setItem('vtop_semester_id', selectedId);
-            } else {
-                console.warn("No semesters returned from VTOP.");
             }
         } catch (error) {
-            console.error("Failed to load semesters via network", error);
         } finally {
             if (triggerRefresh) {
-                refreshCurrentPage(); // Trigger the network fetches for the active dashboard view
+                refreshCurrentPage();
             }
         }
     }
 
-    // Setup initial icons and view state
     if (typeof lucide !== 'undefined') lucide.createIcons();
     if (UI && UI.showPageSection) UI.showPageSection('dashboard', elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
     
-    // START UP SEQUENCE: Open -> Cache -> Valid Check -> Refresh / Login
     loadCachedData();
     checkSessionAndFetchLatest();
 });
