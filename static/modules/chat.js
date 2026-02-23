@@ -92,15 +92,25 @@ export async function initRoommateChat() {
         chatUI.title.textContent = `Room ${tokenData.room}`;
         chatUI.subtitle.textContent = `Block ${tokenData.block}`;
 
-        if (!supabaseClient) {
-            supabaseClient = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.key, {
-                global: { headers: { Authorization: `Bearer ${tokenData.token}` } }
-            });
-        } else {
-            supabaseClient.rest.headers['Authorization'] = `Bearer ${tokenData.token}`;
+        // Ensure token is formatted correctly (fixes PyJWT byte string issues)
+        let secureToken = tokenData.token;
+        if (typeof secureToken === 'string') {
+            secureToken = secureToken.trim();
+            if (secureToken.startsWith("b'") || secureToken.startsWith('b"')) {
+                secureToken = secureToken.slice(2, -1);
+            }
         }
 
-        supabaseClient.realtime.setAuth(tokenData.token);
+        if (!supabaseClient) {
+            supabaseClient = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.key, {
+                global: { headers: { Authorization: `Bearer ${secureToken}` } },
+                accessToken: async () => secureToken // Required for Supabase v2 SDK stability
+            });
+        } else {
+            supabaseClient.rest.headers['Authorization'] = `Bearer ${secureToken}`;
+        }
+
+        supabaseClient.realtime.setAuth(secureToken);
         if (chatSubscription) chatSubscription.unsubscribe();
 
         const { data: messages, error } = await supabaseClient
@@ -110,7 +120,13 @@ export async function initRoommateChat() {
             .order('created_at', { ascending: true })
             .limit(50);
             
-        if (error) throw new Error("Access Denied: " + (error.message || "RLS Policy Blocked Request"));
+        if (error) {
+            // Highly specific error catching to inform about .env configuration
+            if (error.message && (error.message.includes("No suitable key") || error.message.includes("wrong key type"))) {
+                throw new Error("Backend JWT Mismatch: Your SUPABASE_JWT_SECRET in your backend .env file is incorrect. Go to Supabase Dashboard -> Project Settings -> API -> JWT Settings to find your true JWT Secret.");
+            }
+            throw new Error("Access Denied: " + (error.message || "RLS Policy Blocked Request"));
+        }
 
         chatUI.messages.innerHTML = '';
         if (messages && messages.length > 0) {
@@ -157,7 +173,7 @@ export async function initRoommateChat() {
 
     } catch (err) {
         console.error("Chat Init Error:", err);
-        chatUI.messages.innerHTML = `<div class="p-10 flex flex-col items-center text-center"><i data-lucide="lock" class="w-10 h-10 text-red-400 mb-3"></i><p class="text-red-500 font-medium">Security Error</p><p class="text-xs text-gray-500 mt-2 max-w-xs break-words">${err.message}</p></div>`;
+        chatUI.messages.innerHTML = `<div class="p-10 flex flex-col items-center text-center"><i data-lucide="lock" class="w-10 h-10 text-red-400 mb-3"></i><p class="text-red-500 font-medium">Security Error</p><p class="text-xs text-gray-500 mt-2 max-w-sm mx-auto break-words">${err.message}</p></div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
