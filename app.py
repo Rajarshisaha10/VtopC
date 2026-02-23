@@ -105,8 +105,9 @@ def get_chat_token():
         payload = {
             "aud": "authenticated", # Must be 'authenticated' to bypass public anon restrictions
             "role": "authenticated",
-            "room_id": room_id,     # Custom claim used in RLS: auth.jwt()->>'room_id'
-            "reg_no": reg_no,       # Custom claim used in RLS: auth.jwt()->>'reg_no'
+            "sub": str(reg_no),     # Standard Supabase identity claim required by PostgREST
+            "room_id": str(room_id),     # Custom claim used in RLS: auth.jwt()->>'room_id'
+            "reg_no": str(reg_no),       # Custom claim used in RLS: auth.jwt()->>'reg_no'
             "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2) # Token expires in 2 hours
         }
 
