@@ -2,6 +2,10 @@ from flask import Flask, render_template, send_from_directory
 from flask_cors import CORS
 import os
 from whitenoise import WhiteNoise
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import blueprints
 from auth import auth_bp
@@ -23,18 +27,26 @@ app.register_blueprint(data_bp)
 app.register_blueprint(chat_bp)
 
 @app.route('/')
+@app.route('/dashboard')
 def index():
     """Serves the main dashboard page."""
-    # Pass Supabase config from Render environment variables to the frontend
+    firebase_config = {
+        'apiKey': os.environ.get('FIREBASE_API_KEY'),
+        'authDomain': os.environ.get('FIREBASE_AUTH_DOMAIN'),
+        'projectId': os.environ.get('FIREBASE_PROJECT_ID'),
+        'storageBucket': os.environ.get('FIREBASE_STORAGE_BUCKET'),
+        'messagingSenderId': os.environ.get('FIREBASE_MESSAGING_SENDER_ID'),
+        'appId': os.environ.get('FIREBASE_APP_ID')
+    }
+    
+    supabase_config = {
+        'url': os.environ.get('SUPABASE_URL', ''),
+        'anonKey': os.environ.get('SUPABASE_ANON_KEY', '')
+    }
+    
     return render_template('dashboard.html', 
-        supabase_url=os.environ.get('SUPABASE_URL', ''),
-        supabase_key=os.environ.get('SUPABASE_KEY', '')
-    )
-
-@app.route('/dashboard')
-def dashboard():
-    """Serves the main dashboard page (Fallback route)."""
-    return render_template('dashboard.html', 
+        firebase_config=firebase_config, 
+        supabase_config=supabase_config,
         supabase_url=os.environ.get('SUPABASE_URL', ''),
         supabase_key=os.environ.get('SUPABASE_KEY', '')
     )
