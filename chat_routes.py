@@ -43,11 +43,26 @@ def get_chat_token():
             personal = profile.get('personal', {})
             reg_no = personal.get('registerNumber') or profile.get('registerNumber') or personal.get('app_no') or 'UNKNOWN_USER'
 
-        # 2. Extract Room & Block Information
+        # 2. Extract Room & Block Information (3-Tier Robust Extraction)
         h_block = data.get('block')
         h_room = data.get('room_no')
+        hostel_data = profile.get('hostel', {})
         
-        # If frontend didn't pass it, attempt to parse the backend HTML
+        # TIER 1: Attempt to extract from the pre-parsed profile['hostel'] dictionary/list
+        if not h_block or not h_room:
+            if isinstance(hostel_data, dict):
+                h_block = h_block or hostel_data.get('block') or hostel_data.get('Block Name') or hostel_data.get('Block')
+                h_room = h_room or hostel_data.get('room') or hostel_data.get('Room No') or hostel_data.get('Room')
+            elif isinstance(hostel_data, list):
+                # Fallback if hostel data was parsed as a flat list
+                flat = [str(item).strip() for sublist in hostel_data for item in (sublist if isinstance(sublist, list) else [sublist])]
+                for i, val in enumerate(flat):
+                    if not h_block and 'block' in val.lower() and i + 1 < len(flat):
+                        h_block = flat[i+1]
+                    if not h_room and 'room' in val.lower() and i + 1 < len(flat):
+                        h_room = flat[i+1]
+        
+        # TIER 2: Fallback to HTML DOM parsing if still missing (Mimicking JS span traversal)
         if not h_block or not h_room:
             try:
                 html_content = render_template('profile_content.html', profile=profile)
@@ -58,10 +73,10 @@ def get_chat_token():
                     text = span.get_text(strip=True)
                     if text == 'Block':
                         nxt = span.find_next_sibling()
-                        if nxt: h_block = nxt.get_text(strip=True)
+                        if nxt: h_block = h_block or nxt.get_text(strip=True)
                     elif text == 'Room No':
                         nxt = span.find_next_sibling()
-                        if nxt: h_room = nxt.get_text(strip=True)
+                        if nxt: h_room = h_room or nxt.get_text(strip=True)
             except Exception as e:
                 print(f"[CHAT DEBUG] HTML BS4 parsing error: {e}")
 
