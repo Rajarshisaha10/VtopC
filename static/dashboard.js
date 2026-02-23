@@ -528,16 +528,73 @@ document.addEventListener('DOMContentLoaded', () => {
             const personal = profileData.personal || {};
 
             // Extract Registration Number accurately
-            const myRegNo = personal?.registerNumber || profileData?.registerNumber || personal?.app_no || 'UNKNOWN_REG';
+            let myRegNo = personal?.registerNumber || profileData?.registerNumber || personal?.app_no;
+            
+            // Further fallback if it's missing (sometimes nested in flat arrays)
+            if (!myRegNo && Array.isArray(profileData.personal)) {
+                const flat = profileData.personal.flat(Infinity);
+                for (let i = 0; i < flat.length; i++) {
+                    const val = String(flat[i]).toLowerCase();
+                    if ((val.includes('register') || val.includes('reg no')) && i + 1 < flat.length) {
+                        myRegNo = flat[i + 1];
+                        break;
+                    }
+                }
+            }
+            myRegNo = myRegNo || 'Campus User';
 
             let roomTitle, roomSub, roomId;
 
+            // --- SMART HOSTEL DATA EXTRACTION ---
+            let hBlock = null;
+            let hRoom = null;
+            
+            if (profileData.hostel) {
+                const hData = profileData.hostel;
+                
+                // 1. Direct object matching
+                if (typeof hData === 'object' && !Array.isArray(hData)) {
+                    hBlock = hData['Block'] || hData.block || hData.Block;
+                    hRoom = hData['Room No'] || hData.room || hData.Room;
+                } 
+                
+                // 2. Key-Value List matching (e.g. flat list: ["Block", "D1...", "Room No", "1129"])
+                if (!hBlock && !hRoom && Array.isArray(hData)) {
+                    const flat = hData.flat(Infinity);
+                    for (let i = 0; i < flat.length; i++) {
+                        const val = String(flat[i]).trim();
+                        if (val.toLowerCase() === 'block' && i + 1 < flat.length) hBlock = flat[i + 1];
+                        if (val.toLowerCase() === 'room no' && i + 1 < flat.length) hRoom = flat[i + 1];
+                    }
+                }
+                
+                // 3. User described structure: [ "D1 Block Mens...", ["1129"] ]
+                if (!hBlock && !hRoom && Array.isArray(hData) && hData.length >= 2) {
+                    if (typeof hData[0] === 'string') hBlock = hData[0];
+                    if (Array.isArray(hData[1])) hRoom = String(hData[1][0]);
+                    else hRoom = String(hData[1]);
+                }
+            }
+            
+            // Clean up block name (e.g. "D1 Block Mens Hostel (D1 - Block )" -> "D1")
+            if (hBlock && typeof hBlock === 'string') {
+                const match = hBlock.match(/\((.*?)\)/);
+                if (match) {
+                    hBlock = match[1].replace(/-\s*Block/i, '').trim(); 
+                } else {
+                    hBlock = hBlock.split(' ')[0]; // E.g., "D1" from "D1 Block Mens..."
+                }
+            }
+            if (hRoom) {
+                hRoom = String(hRoom).trim();
+            }
+            // ------------------------------------
+
             // If hostel info exists, use Roommate Chat. Otherwise, gracefully fallback to Global Chat.
-            if (profileData.hostel && profileData.hostel.room) {
-                const hostel = profileData.hostel;
-                roomId = `${hostel.block || 'BLK'}-${hostel.room}`.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toUpperCase();
-                roomTitle = `Room ${hostel.room}`;
-                roomSub = `Block ${hostel.block || 'Unknown'}`;
+            if (hBlock && hRoom) {
+                roomId = `${hBlock}-${hRoom}`.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toUpperCase();
+                roomTitle = `Room ${hRoom}`;
+                roomSub = `Block ${hBlock}`;
             } else {
                 roomId = 'CAMPUS-LOUNGE';
                 roomTitle = 'Campus Lounge';
@@ -663,8 +720,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 user_id: myRegNo,     // Identity tracking
                 user_name: myRegNo,   // Display name tracking (Forcing RegNo as requested)
                 content: content,
-                file_url: fileUrl,
-                file_name: fileNameDb // Store original filename if your schema supports it (optional but good practice)
+                file_url: fileUrl
+                // Removed file_name insert to prevent Supabase schema errors if column doesn't exist
             }]);
 
             if (msgError) throw msgError;
