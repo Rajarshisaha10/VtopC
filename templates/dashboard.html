@@ -120,6 +120,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- CRYPTO JS FOR SECURE DIRECTORY -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <!-- Supabase JS SDK for Real-time Chat -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Inject Supabase config from Flask environment variables securely
+        window.SUPABASE_CONFIG = {
+            url: "{{ supabase_url }}",
+            key: "{{ supabase_key }}"
+        };
+    </script>
 </head>
 
 <body
@@ -219,6 +229,13 @@
                 class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                 data-section="profile">
                 <i data-lucide="user" class="mr-3 h-5 w-5"></i> My Profile
+            </a>
+
+            <!-- ROOMMATE CHAT LINK -->
+            <a href="#"
+                class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                data-section="chat">
+                <i data-lucide="message-square" class="mr-3 h-5 w-5"></i> Roommate Chat
             </a>
         </nav>
 
@@ -407,6 +424,14 @@
             <div id="profile" class="hidden page-section">
                 <div id="profile-container"></div>
             </div>
+
+            <!-- CHAT SECTION: Dynamic Loading Container -->
+            <div id="chat" class="hidden page-section h-full flex flex-col">
+                <div id="chat-content-area" class="h-full">
+                    <!-- chat_content.html will be injected here via JS -->
+                </div>
+            </div>
+
         </div>
     </main>
 

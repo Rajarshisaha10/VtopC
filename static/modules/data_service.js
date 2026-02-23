@@ -44,6 +44,9 @@ function loadFromCache(target, container, params) {
             if (target === TARGETS.TIMETABLE && cachedData.raw_data) {
                 state.setTimetable(cachedData.raw_data.timetable);
             }
+            if ((target === TARGETS.PROFILE || target === 'student/studentProfileView') && (cachedData.data || cachedData.raw_data)) {
+                state.cachedProfile = cachedData.data || cachedData.raw_data;
+            }
 
             return true;
         } catch (e) {
@@ -100,18 +103,31 @@ function handleFetchError(error, container, target, params) {
 
 /**
  * Primary Data Fetcher with Stale-While-Revalidate Strategy.
- * 1. Show Cache immediately.
- * 2. Fetch fresh data in background.
- * 3. Update UI and Cache when fresh data arrives.
+ * Modified to support returning raw data (returnDataOnly) for background tasks like Chat initialization.
  */
-export async function fetchAndDisplay(target, containerElement, title, extraParams = {}) {
-    if (!containerElement) return;
+export async function fetchAndDisplay(target, containerElement, title, extraParams = {}, returnDataOnly = false) {
+    if (!containerElement && !returnDataOnly) return;
+
+    let hasCachedData = false;
+    let cachedObject = null;
 
     // STEP 1: Show Cache First (Instant Load)
-    const hasCachedData = loadFromCache(target, containerElement, extraParams);
+    if (containerElement && !returnDataOnly) {
+        hasCachedData = loadFromCache(target, containerElement, extraParams);
+    } else if (returnDataOnly) {
+        // Extract cache data silently if we just need the raw data (e.g., Profile logic)
+        const cachedStr = localStorage.getItem(getStorageKey(target, extraParams));
+        if (cachedStr) {
+            try { 
+                const p = JSON.parse(cachedStr); 
+                cachedObject = p.data || p.raw_data || p; 
+                if (target === TARGETS.PROFILE || target === 'student/studentProfileView') state.cachedProfile = cachedObject;
+            } catch(e) {}
+        }
+    }
 
     // STEP 2: Show Loading State (Only if no cache found)
-    if (!hasCachedData) {
+    if (!hasCachedData && containerElement && !returnDataOnly) {
         containerElement.innerHTML = `
             <div class="flex flex-col items-center justify-center py-12">
                 <i data-lucide="loader" class="animate-spin h-8 w-8 text-indigo-600 mb-3"></i>
@@ -122,10 +138,10 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
 
     // STEP 3: Check Online Status
     if (!navigator.onLine) {
-        if (!hasCachedData) {
+        if (!hasCachedData && containerElement && !returnDataOnly) {
             containerElement.innerHTML = `<div class="p-6 text-center"><p class="text-gray-500">No data available offline.</p></div>`;
         }
-        return;
+        return cachedObject;
     }
 
     // STEP 4: Network Fetch (Background Refresh)
@@ -138,6 +154,7 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
             ...extraParams
         };
 
+        // Standard /fetch-data call 
         const response = await fetch(`${API_BASE_URL}/fetch-data`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -152,45 +169,71 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         const data = await response.json();
 
         if (data.status === 'success') {
-            // --- CRITICAL FIX START: Handle Auto-Semester Switch ---
+            // Handle Auto-Semester Switch
             if (data.new_semester_id && data.new_semester_id !== state.currentSemesterId) {
                 console.log(`[Data] Auto-switching semester to ${data.new_semester_id}`);
-
-                // 1. Update Internal State
                 state.setSemesterId(data.new_semester_id);
-
-                // 2. Persist to Storage
                 localStorage.setItem('vtop_semester_id', data.new_semester_id);
-
-                // 3. Update UI Dropdown (Visual Sync)
                 const semSelect = document.getElementById('semester-select');
-                if (semSelect) {
-                    semSelect.value = data.new_semester_id;
-                }
+                if (semSelect) semSelect.value = data.new_semester_id;
             }
-            // --- CRITICAL FIX END ---
 
-            // A. Update UI with fresh data
-            containerElement.innerHTML = data.html_content;
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            // Update UI with fresh data
+            if (containerElement && !returnDataOnly) {
+                containerElement.innerHTML = data.html_content;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
 
-            // B. Update Runtime State
-            if (target === TARGETS.ATTENDANCE) state.setAttendance(data.raw_data);
-            if (target === TARGETS.TIMETABLE) state.setTimetable(data.raw_data.timetable);
+            // Update Runtime State
+            if (target === TARGETS.ATTENDANCE && data.raw_data) state.setAttendance(data.raw_data);
+            if (target === TARGETS.TIMETABLE && data.raw_data) state.setTimetable(data.raw_data.timetable);
+            
+            // --- TEMPORARY OVERRIDE FOR CHAT TESTING ---
+            if (target === TARGETS.PROFILE || target === 'student/studentProfileView') {
+                const regNo = localStorage.getItem('vtop_regno_cache') || 'TEST_USER';
+                
+                // Force a fake profile specifically to test the chat room
+                const mockProfile = {
+                    personal: { app_no: regNo, name: regNo },
+                    hostel: { block: 'Test-Block', room: 'Test-Room' }
+                };
+                
+                state.cachedProfile = mockProfile;
+                data.data = mockProfile;
+                data.raw_data = mockProfile;
+            }
 
-            // C. Save to Persistent Cache
-            // Note: We do this AFTER updating state.currentSemesterId so the key is correct
+            // Save to Persistent Cache
             try {
                 localStorage.setItem(getStorageKey(target, extraParams), JSON.stringify(data));
                 console.log(`[Cache] Updated ${target}`);
             } catch (e) { console.warn("Cache save failed", e); }
+
+            // Return data object so background callers (like Chat) can use it
+            return data.data || data.raw_data || data;
 
         } else {
             throw new Error(data.message);
         }
 
     } catch (error) {
-        handleFetchError(error, containerElement, target, extraParams);
+        
+        // --- FALLBACK FOR CHAT: Force a test profile if fetch failed ---
+        if (target === TARGETS.PROFILE || target === 'student/studentProfileView') {
+            console.warn("Profile fetch failed, enforcing TEST ROOM fallback for chat.");
+            const regNo = localStorage.getItem('vtop_regno_cache') || 'TEST_USER';
+            const mockProfile = {
+                personal: { app_no: regNo, name: regNo },
+                hostel: { block: 'Test-Block', room: 'Test-Room' }
+            };
+            state.cachedProfile = mockProfile;
+            if (returnDataOnly) return mockProfile; 
+        }
+
+        if (!returnDataOnly && containerElement) {
+            handleFetchError(error, containerElement, target, extraParams);
+        }
+        return cachedObject;
     }
 }
 
@@ -396,7 +439,14 @@ export async function fetchAndDisplayODSnapshot() {
     if (!navigator.onLine) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/get-od-snapshot`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id'), semesterSubId: state.currentSemesterId }) });
+        const response = await fetch(`${API_BASE_URL}/get-od-snapshot`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                session_id: localStorage.getItem('vtop_session_id'), 
+                semesterSubId: state.currentSemesterId 
+            }) 
+        });
         const data = await response.json();
         if (data.status === 'success') {
             UI.updateODSnapshot(data);

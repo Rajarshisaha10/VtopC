@@ -23,7 +23,12 @@ def fetch_data():
 
     try:
         # Get session details once for all handlers
-        session, authorized_id, csrf_token, base_url = get_session_details(session_id)
+        session_data = get_session_details(session_id)
+        if not session_data:
+            return jsonify({'status': 'error', 'message': 'Session expired or invalid'}), 401
+            
+        session, authorized_id, csrf_token, base_url = session_data
+        
         context = {
             'session': session,
             'authorized_id': authorized_id,
@@ -58,11 +63,13 @@ def fetch_data():
             return jsonify({'status': 'success', 'html_content': html})
 
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 401
-
-@data_bp.route('/fetch-profile-credentials', methods=['POST'])
-def fetch_profile_credentials():
-    return profile.fetch_credentials(request)
+        err_msg = str(e).lower()
+        # If VTOP is slow or unreachable, return 502 to PREVENT the frontend from logging the user out.
+        if "timeout" in err_msg or "connection" in err_msg or "max retries" in err_msg:
+            return jsonify({'status': 'error', 'message': 'VTOP is taking too long to respond.'}), 502
+        
+        # If the error is something else, return 401 to trigger a clean re-login.
+        return jsonify({'status': 'error', 'message': 'Session expired or invalid.'}), 401
 
 @data_bp.route('/fetch-attendance-detail', methods=['POST'])
 def fetch_attendance_detail():

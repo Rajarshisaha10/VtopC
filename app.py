@@ -1,6 +1,7 @@
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_from_directory, jsonify
 from flask_cors import CORS
 import os
+from supabase import create_client, Client
 from whitenoise import WhiteNoise
 
 # Import blueprints
@@ -23,12 +24,32 @@ app.register_blueprint(data_bp)
 @app.route('/')
 def index():
     """Serves the main dashboard page."""
-    return render_template('dashboard.html')
+    # Pass Supabase config from Render environment variables to the frontend
+    return render_template('dashboard.html', 
+        supabase_url=os.environ.get('SUPABASE_URL', ''),
+        supabase_key=os.environ.get('SUPABASE_KEY', '')
+    )
+
+@app.route('/dashboard')
+def dashboard():
+    """Serves the main dashboard page (Fallback route)."""
+    return render_template('dashboard.html', 
+        supabase_url=os.environ.get('SUPABASE_URL', ''),
+        supabase_key=os.environ.get('SUPABASE_KEY', '')
+    )
 
 @app.route('/login')
 def login():
     """Serves the login page."""
     return render_template('login.html')
+
+@app.route('/fetch-chat', methods=['POST'])
+def fetch_chat():
+    """Returns the chat room partial HTML."""
+    return jsonify({
+        'status': 'success',
+        'html_content': render_template('chat_content.html')
+    })
 
 @app.route('/sw.js')
 def service_worker():
