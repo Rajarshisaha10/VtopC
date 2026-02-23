@@ -672,7 +672,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (err) {
             console.error("Chat Init Error:", err);
-            chatUI.messages.innerHTML = '<div class="p-10 flex flex-col items-center text-center"><i data-lucide="wifi-off" class="w-10 h-10 text-red-400 mb-3"></i><p class="text-red-500 font-medium">Connection error</p><p class="text-sm text-gray-500 mt-1">Failed to connect to the secure chat server.</p></div>';
+            chatUI.messages.innerHTML = '<div class="p-10 flex flex-col items-center text-center"><i data-lucide="wifi-off" class="w-10 h-10 text-red-400 mb-3"></i><p class="text-red-500 font-medium">Connection error</p><p class="text-sm text-gray-500 mt-1">Failed to connect to the secure chat server. ' + (err.message || '') + '</p></div>';
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
@@ -692,41 +692,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             let fileUrl = null;
-            let fileNameDb = null;
             
             // 1. Upload file if it exists
             if (file) {
-                // Ensure unique filename to prevent overwrites in storage
                 const safeFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
                 const { data, error } = await supabaseClient.storage
                     .from('chat-attachments')
                     .upload(`${currentChatRoomId}/${safeFileName}`, file);
                 
-                if (error) throw error;
+                if (error) {
+                    throw new Error("Storage Error: " + error.message + " (Did you create the 'chat-attachments' bucket?)");
+                }
                 
                 if (data) {
                     const { data: urlData } = supabaseClient.storage
                         .from('chat-attachments')
                         .getPublicUrl(`${currentChatRoomId}/${safeFileName}`);
                     fileUrl = urlData.publicUrl;
-                    fileNameDb = file.name; // Keep original name for display
                 }
             }
 
-            // 2. Insert Message into Database
-            // PER REQUIREMENT: user_name MUST be the Registration Number
-            const { error: msgError } = await supabaseClient.from('messages').insert([{
+            // 2. Prepare Payload dynamically (only include file_url if a file was uploaded)
+            const payload = {
                 room_id: currentChatRoomId,
-                user_id: myRegNo,     // Identity tracking
-                user_name: myRegNo,   // Display name tracking (Forcing RegNo as requested)
-                content: content,
-                file_url: fileUrl
-                // Removed file_name insert to prevent Supabase schema errors if column doesn't exist
-            }]);
+                user_id: String(myRegNo),
+                user_name: String(myRegNo),
+                content: content
+            };
 
-            if (msgError) throw msgError;
+            if (fileUrl) {
+                payload.file_url = fileUrl;
+            }
 
-            // 3. Clear Inputs on Success
+            // 3. Insert Message into Database
+            const { error: msgError } = await supabaseClient.from('messages').insert([payload]);
+
+            if (msgError) {
+                console.error("Supabase Database Error Details:", msgError);
+                throw new Error("DB Error: " + (msgError.message || msgError.details || JSON.stringify(msgError)));
+            }
+
+            // 4. Clear Inputs on Success
             ui.input.value = '';
             ui.input.style.height = 'auto'; // Reset auto-grow
             ui.fileInput.value = '';
@@ -734,7 +740,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (e) {
             console.error("Failed to send message:", e);
-            alert("Failed to send message. Please check your connection.");
+            // This alert will now explicitly tell you what Supabase is rejecting!
+            alert(e.message || "Failed to send message. Please check your connection.");
         } finally {
             // Restore UI state
             ui.sendBtn.disabled = false;
