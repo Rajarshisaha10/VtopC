@@ -23,77 +23,61 @@ def get_chat_token():
         session_id = data.get('session_id')
         user_data = session_storage.get(session_id)
         
-        # Verify that the session is valid and we have fetched the user's profile
-        if not user_data or 'profile_data' not in user_data:
-            return jsonify({'status': 'error', 'message': 'Profile data required. Please visit the Profile page first.'}), 401
-
-        profile = user_data['profile_data']
+        if not user_data:
+            return jsonify({'status': 'error', 'message': 'Invalid or expired session.'}), 401
 
         # ==========================================================
-        # DEBUGGING: Print the raw profile data to the console
+        # 1. EXTRACT DATA DIRECTLY FROM FRONTEND
         # ==========================================================
-        print("\n" + "="*60)
-        print("[CHAT DEBUG] RAW HOSTEL DATA FROM PARSER:")
-        print(profile.get('hostel', 'NO HOSTEL KEY FOUND IN PROFILE'))
-        print("="*60 + "\n")
-
-        # 1. Extract Registration Number
         reg_no = data.get('reg_no')
-        if not reg_no:
-            personal = profile.get('personal', {})
-            reg_no = personal.get('registerNumber') or profile.get('registerNumber') or personal.get('app_no') or 'UNKNOWN_USER'
-
-        # 2. Extract Room & Block Information (3-Tier Robust Extraction)
         h_block = data.get('block')
         h_room = data.get('room_no')
-        hostel_data = profile.get('hostel', {})
-        
-        # TIER 1: Attempt to extract from the pre-parsed profile['hostel'] dictionary/list
-        if not h_block or not h_room:
+
+        # ==========================================================
+        # 2. FALLBACK TO SESSION CACHE ONLY IF NEEDED
+        # ==========================================================
+        if not h_block or not h_room or not reg_no:
+            if 'profile_data' not in user_data:
+                return jsonify({'status': 'error', 'message': 'Profile data required. Please visit the Profile page first.'}), 401
+
+            profile = user_data['profile_data']
+            personal = profile.get('personal', {})
+            reg_no = reg_no or personal.get('registerNumber') or profile.get('registerNumber') or personal.get('app_no') or 'UNKNOWN_USER'
+            hostel_data = profile.get('hostel', {})
+            
+            # Tier 1 fallback
             if isinstance(hostel_data, dict):
                 h_block = h_block or hostel_data.get('block') or hostel_data.get('Block Name') or hostel_data.get('Block')
                 h_room = h_room or hostel_data.get('room') or hostel_data.get('Room No') or hostel_data.get('Room')
-            elif isinstance(hostel_data, list):
-                # Fallback if hostel data was parsed as a flat list
-                flat = [str(item).strip() for sublist in hostel_data for item in (sublist if isinstance(sublist, list) else [sublist])]
-                for i, val in enumerate(flat):
-                    if not h_block and 'block' in val.lower() and i + 1 < len(flat):
-                        h_block = flat[i+1]
-                    if not h_room and 'room' in val.lower() and i + 1 < len(flat):
-                        h_room = flat[i+1]
-        
-        # TIER 2: Fallback to HTML DOM parsing if still missing (Mimicking JS span traversal)
-        if not h_block or not h_room:
-            try:
-                html_content = render_template('profile_content.html', profile=profile)
-                soup = BeautifulSoup(html_content, 'html.parser')
-                
-                spans = soup.find_all('span')
-                for span in spans:
-                    text = span.get_text(strip=True)
-                    if text == 'Block':
-                        nxt = span.find_next_sibling()
-                        if nxt: h_block = h_block or nxt.get_text(strip=True)
-                    elif text == 'Room No':
-                        nxt = span.find_next_sibling()
-                        if nxt: h_room = h_room or nxt.get_text(strip=True)
-            except Exception as e:
-                print(f"[CHAT DEBUG] HTML BS4 parsing error: {e}")
+            
+            # Tier 2 fallback (DOM parsing)
+            if not h_block or not h_room:
+                try:
+                    html_content = render_template('profile_content.html', profile=profile)
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    spans = soup.find_all('span')
+                    for span in spans:
+                        text = span.get_text(strip=True)
+                        if text == 'Block':
+                            nxt = span.find_next_sibling()
+                            if nxt: h_block = h_block or nxt.get_text(strip=True)
+                        elif text == 'Room No':
+                            nxt = span.find_next_sibling()
+                            if nxt: h_room = h_room or nxt.get_text(strip=True)
+                except Exception as e:
+                    pass
 
-        # Print what the backend actually decided on
-        print(f"[CHAT DEBUG] Final Extracted Block: '{h_block}'")
-        print(f"[CHAT DEBUG] Final Extracted Room: '{h_room}'\n")
+        print(f"[CHAT DEBUG] Extracted Block: '{h_block}' | Extracted Room: '{h_room}' | RegNo: '{reg_no}'")
 
         # ==========================================================
-        # STRICT ENFORCEMENT: NO ROOM = NO CHAT (No Global Fallback)
+        # STRICT ENFORCEMENT: NO ROOM = NO CHAT
         # ==========================================================
         if not h_block or not h_room or str(h_block).strip() in ['None', 'N/A', ''] or str(h_room).strip() in ['None', 'N/A', '']:
             error_msg = f"Hostel assignment not found. Debug Info -> Block: '{h_block}', Room: '{h_room}'"
             print(f"[CHAT DEBUG] REJECTED: {error_msg}")
-            
             return jsonify({
                 'status': 'error', 
-                'message': f'{error_msg}. Roommate chat is strictly restricted to assigned hostellers.'
+                'message': 'Hostel allocation not found. Roommate chat is strictly restricted to assigned hostellers.'
             }), 403
 
         # Clean up verbose block names: "D1 Block Mens Hostel (D1 - Block )" -> "D1"
@@ -109,7 +93,6 @@ def get_chat_token():
         # 3. Generate Secure JWT Using Supabase Secret
         secret = os.environ.get('SUPABASE_JWT_SECRET')
         if not secret:
-            print("ERROR: SUPABASE_JWT_SECRET environment variable is missing!")
             return jsonify({'status': 'error', 'message': 'Server configuration error (Missing JWT Secret)'}), 500
 
         payload = {

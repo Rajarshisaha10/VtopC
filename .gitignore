@@ -10,6 +10,7 @@ pycache/
 User-specific session files (sensitive data)
 
 vtop_session.pkl
+.env
 Temporary debug files
 
 *.html # This will ignore all .html files in the root, like timetable_debug.html

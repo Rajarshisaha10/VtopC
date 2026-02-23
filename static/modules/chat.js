@@ -19,7 +19,7 @@ export async function initRoommateChat() {
 
     if (!chatUI.messages) return;
 
-    chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-400"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Authenticating Secure Connection...</p></div>';
+    chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-400"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Locating your room...</p></div>';
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
     if (!window.SUPABASE_CONFIG || !window.SUPABASE_CONFIG.url || !window.SUPABASE_CONFIG.key) {
@@ -28,14 +28,53 @@ export async function initRoommateChat() {
     }
 
     try {
+        const sessionId = localStorage.getItem('vtop_session_id');
+
+        // =====================================================
+        // 1. FETCH & PARSE PROFILE HTML (Like room_manager.js)
+        // =====================================================
+        const profileRes = await fetch(`${API_BASE_URL}/fetch-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, target: 'student/studentProfileView' })
+        });
+        const profileData = await profileRes.json();
+        
+        let block = null;
+        let roomNo = null;
+        let regNo = localStorage.getItem('vtop_username_cache') || "UNKNOWN";
+        regNo = regNo.trim().toUpperCase();
+
+        if (profileData.status === 'success' && profileData.html_content) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(profileData.html_content, 'text/html');
+            const spans = doc.querySelectorAll('span');
+            spans.forEach(span => {
+                const text = span.textContent.trim();
+                if (text === 'Block') block = span.nextElementSibling?.textContent.trim() || block;
+                if (text === 'Room No') roomNo = span.nextElementSibling?.textContent.trim() || roomNo;
+            });
+        }
+
+        // =====================================================
+        // 2. FETCH SECURE JWT TOKEN (Bypassing session check)
+        // =====================================================
+        chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-400"><i data-lucide="shield" class="animate-pulse h-8 w-8 mb-2 text-indigo-500"></i><p>Authenticating connection...</p></div>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
         const tokenRes = await fetch(`${API_BASE_URL}/get-chat-token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id') })
+            body: JSON.stringify({ 
+                session_id: sessionId,
+                reg_no: regNo,
+                block: block,
+                room_no: roomNo
+            })
         });
         const tokenData = await tokenRes.json();
 
-        // 1. ERROR OUT GRACEFULLY IF NO ROOM IS ASSIGNED
+        // 3. ERROR OUT GRACEFULLY IF NO ROOM IS ASSIGNED
         if (tokenData.status !== 'success' || !tokenRes.ok) {
             chatUI.messages.innerHTML = `
                 <div class="p-10 flex flex-col items-center text-center">
@@ -47,23 +86,21 @@ export async function initRoommateChat() {
             return;
         }
 
-        const { token, room_id, reg_no, block, room } = tokenData;
-        currentChatRoomId = room_id;
-        const myRegNo = reg_no;
-
-        // 2. SUCCESSFUL ROOM FOUND - Update UI
-        chatUI.title.textContent = `Room ${room}`;
-        chatUI.subtitle.textContent = `Block ${block}`;
+        // 4. SUCCESSFUL ROOM FOUND - Update UI
+        currentChatRoomId = tokenData.room_id;
+        const myRegNo = tokenData.reg_no;
+        chatUI.title.textContent = `Room ${tokenData.room}`;
+        chatUI.subtitle.textContent = `Block ${tokenData.block}`;
 
         if (!supabaseClient) {
             supabaseClient = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.key, {
-                global: { headers: { Authorization: `Bearer ${token}` } }
+                global: { headers: { Authorization: `Bearer ${tokenData.token}` } }
             });
         } else {
-            supabaseClient.rest.headers['Authorization'] = `Bearer ${token}`;
+            supabaseClient.rest.headers['Authorization'] = `Bearer ${tokenData.token}`;
         }
 
-        supabaseClient.realtime.setAuth(token);
+        supabaseClient.realtime.setAuth(tokenData.token);
         if (chatSubscription) chatSubscription.unsubscribe();
 
         const { data: messages, error } = await supabaseClient
