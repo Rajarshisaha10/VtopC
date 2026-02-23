@@ -100,7 +100,7 @@ def parse_profile(html_content):
     hostel_table = soup.find('div', id='collapseFive')
     if hostel_table:
         profile_data['hostel'] = {
-            'block': get_row_value(hostel_table, 'Block Name'),
+            'block': get_row_value(hostel_table, 'Block'),
             'room': get_row_value(hostel_table, 'Room No'),
             'bed_type': get_row_value(hostel_table, 'Bed Type'),
             'mess': get_row_value(hostel_table, 'Mess Information')

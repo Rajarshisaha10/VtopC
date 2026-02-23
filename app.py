@@ -6,6 +6,7 @@ import datetime
 import re
 from supabase import create_client, Client
 from whitenoise import WhiteNoise
+from bs4 import BeautifulSoup
 
 # Import blueprints and session manager
 from auth import auth_bp
@@ -71,18 +72,44 @@ def get_chat_token():
             return jsonify({'status': 'error', 'message': 'Profile data required. Please visit the Profile page first.'}), 401
 
         profile = user_data['profile_data']
-        personal = profile.get('personal', {})
-        hostel = profile.get('hostel', {})
 
-        # 1. Extract Registration Number
-        reg_no = personal.get('registerNumber') or profile.get('registerNumber') or personal.get('app_no') or 'UNKNOWN_USER'
+        # ==========================================================
+        # 1. EXTRACT REGISTRATION NUMBER
+        # ==========================================================
+        # Accept client overrides first, otherwise fall back to backend extraction
+        reg_no = data.get('reg_no')
+        if not reg_no:
+            personal = profile.get('personal', {})
+            reg_no = personal.get('registerNumber') or profile.get('registerNumber') or personal.get('app_no') or 'UNKNOWN_USER'
 
-        # 2. Extract Room Information (Directly from parser output)
-        h_block = hostel.get('block')
-        h_room = hostel.get('room')
+        # ==========================================================
+        # 2. EXTRACT ROOM & BLOCK (Mimicking your JS Logic precisely)
+        # ==========================================================
+        h_block = data.get('block')
+        h_room = data.get('room_no')
+        
+        # If the frontend didn't pass them in the payload, replicate the DOMParser approach!
+        if not h_block or not h_room:
+            try:
+                # Render the HTML template natively to mimic what the frontend sees
+                html_content = render_template('profile_content.html', profile=profile)
+                soup = BeautifulSoup(html_content, 'html.parser')
+                
+                # Iterate spans exactly like your Javascript snippet does!
+                spans = soup.find_all('span')
+                for span in spans:
+                    text = span.get_text(strip=True)
+                    if text == 'Block':
+                        nxt = span.find_next_sibling()
+                        if nxt: h_block = nxt.get_text(strip=True)
+                    elif text == 'Room No':
+                        nxt = span.find_next_sibling()
+                        if nxt: h_room = nxt.get_text(strip=True)
+            except Exception as e:
+                print(f"[CHAT DEBUG] HTML BS4 parsing error: {e}")
 
         # Assign room ID dynamically
-        if not h_block or not h_room:
+        if not h_block or not h_room or str(h_block).strip() in ['None', 'N/A'] or str(h_room).strip() in ['None', 'N/A']:
             room_id = 'CAMPUS-LOUNGE'
         else:
             # Clean up verbose block names: "D1 Block Mens Hostel (D1 - Block )" -> "D1"
