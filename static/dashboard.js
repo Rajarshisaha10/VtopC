@@ -3,6 +3,10 @@ import { state } from './modules/state.js';
 import * as UI from './modules/ui.js';
 import * as Data from './modules/data_service.js';
 import { initRoommateChat } from './modules/chat.js'; // Added Import
+import * as RoomManager from './modules/room_manager.js'; // Your import
+import * as RoomieMatch from './modules/roomie_match.js'; // Your import
+import * as NotesForum from './modules/notes_forum.js';   // Your import
+import * as TaskManager from './modules/task_manager.js'; // Your import
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded. Version: Modular Secure Chat");
@@ -186,6 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 initRoommateChat(); // Clean call to our new modular logic
             }
 
+            else if (section === 'find-people') RoomieMatch.initRoomieMatch();
+            else if (section === 'notes-forum') NotesForum.initNotesForum();
+            else if (section === 'task-hub') TaskManager.initTaskManager();
+
             closeSidebar();
             elements.contentContainer.scrollTop = 0;
         });
@@ -214,6 +222,9 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (subsectionId === 'academics-calendar') Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar");
             else if (subsectionId === 'examinations-marks') Data.fetchAndDisplay(TARGETS.MARKS, elements.marks, "Marks");
             else if (subsectionId === 'examinations-schedule') Data.fetchAndDisplay(TARGETS.EXAM_SCHEDULE, elements.examSchedule, "Exam Schedule");
+            else if (subsectionId === 'hostel-my-room') {
+                            RoomManager.populateMyRoomData();
+            }
             else if (subsectionId === 'extra-directory') {
                 if (!isDirectoryUnlocked) {
                     elements.dirPassword.value = '';

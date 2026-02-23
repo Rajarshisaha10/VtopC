@@ -20,7 +20,6 @@
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
 
-    <!-- LOCAL TAILWIND (Runs offline) -->
     <script src="{{ url_for('static', filename='tailwind.js') }}"></script>
     <script>
         tailwind.config = {
@@ -38,9 +37,7 @@
             }
         }
     </script>
-    <!-- Fallback font if offline -->
     <style>
-        /* Simple system font stack for offline usage if Google Fonts fail */
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
         }
@@ -114,17 +111,12 @@
         }
     </style>
 
-    <!-- LOCAL ICONS & UTILS -->
     <script src="{{ url_for('static', filename='lucide.js') }}"></script>
-    <!-- Google Fonts (Optional, will fail gracefully offline) -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- CRYPTO JS FOR SECURE DIRECTORY -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
-    <!-- Supabase JS SDK for Real-time Chat -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Inject Supabase config from Flask environment variables securely
         window.SUPABASE_CONFIG = {
             url: "{{ supabase_url }}",
             key: "{{ supabase_key }}"
@@ -207,6 +199,37 @@
 
             <div x-data="{ open: false }" class="space-y-1">
                 <button @click="open = !open"
+                    class="w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors">
+                    <div class="flex items-center"><i data-lucide="home" class="mr-3 h-5 w-5"></i> Hostel
+                    </div>
+                    <i data-lucide="chevron-down" class="h-4 w-4 transition-transform duration-200"
+                        :class="{'rotate-180': open}"></i>
+                </button>
+                <div x-show="open" class="pl-11 space-y-1">
+                    <a href="#"
+                        class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                        data-parent="hostel" data-subsection="hostel-my-room">My Room</a>
+                </div>
+            </div>
+
+            <a href="#"
+                class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                data-section="notes-forum">
+                <i data-lucide="message-square" class="mr-3 h-5 w-5"></i> Notes Forum
+            </a>
+
+            <a href="#"
+                class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                data-section="find-people">
+                <i data-lucide="users" class="mr-3 h-5 w-5"></i> Find People
+            </a>
+
+            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-section="task-hub">
+                <i data-lucide="check-square" class="mr-3 h-5 w-5"></i> Task Hub
+            </a>
+
+            <div x-data="{ open: false }" class="space-y-1 mt-4 border-t border-gray-100 dark:border-gray-700 pt-2">
+                <button @click="open = !open"
                     class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                     data-section="extra">
                     <div class="flex items-center"><i data-lucide="plus-circle" class="mr-3 h-5 w-5"></i> Extra Options
@@ -223,13 +246,6 @@
                         data-parent="extra" data-subsection="extra-directory">Student Directory</a>
                 </div>
             </div>
-
-            <!-- ROOMMATE CHAT LINK -->
-            <a href="#"
-                class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
-                data-section="chat">
-                <i data-lucide="message-square" class="mr-3 h-5 w-5"></i> Roommate Chat
-            </a>
         </nav>
 
         <div class="p-4 border-t border-gray-200 dark:border-gray-700 mt-auto">
@@ -346,6 +362,142 @@
                 </div>
             </div>
 
+            <div id="hostel" class="hidden page-section">
+                <div id="hostel-my-room" class="hostel-subsection">
+                    
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white">My Room</h2>
+                        <button class="nav-link px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center shadow-sm cursor-pointer" data-section="chat">
+                            <i data-lucide="message-square" class="h-4 w-4 mr-2"></i> Chat Room
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center items-center text-center">
+                            <span class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 flex items-center"><i data-lucide="door-open" class="w-3 h-3 mr-1"></i> Room No</span>
+                            <span id="ui-room-no" class="text-2xl font-black text-indigo-600 dark:text-indigo-400">...</span>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center items-center text-center">
+                            <span class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 flex items-center"><i data-lucide="building" class="w-3 h-3 mr-1"></i> Block</span>
+                            <span id="ui-room-block" class="text-2xl font-black text-indigo-600 dark:text-indigo-400">...</span>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center items-center text-center">
+                            <span class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 flex items-center"><i data-lucide="bed" class="w-3 h-3 mr-1"></i> Type</span>
+                            <span id="ui-room-type" class="text-lg font-bold text-gray-800 dark:text-gray-200 mt-1">...</span>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-center items-center text-center">
+                            <span class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1.5 flex items-center"><i data-lucide="utensils" class="w-3 h-3 mr-1"></i> Mess</span>
+                            <span id="ui-room-mess" class="text-lg font-bold text-gray-800 dark:text-gray-200 mt-1">...</span>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center">
+                        <i data-lucide="users" class="h-5 w-5 mr-2 text-indigo-500"></i> Roommates
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8" id="roommates-container">
+                        <div class="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 text-sm text-gray-500">Loading roommates...</div>
+                    </div>
+
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-white flex items-center">
+                            <i data-lucide="calendar" class="h-5 w-5 mr-2 text-indigo-500"></i> Class Timetable (Busy Status)
+                        </h3>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden mb-6">
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-sm text-left border-collapse">
+                                <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 font-medium border-b border-gray-200 dark:border-gray-700 text-[10px]">
+                                    <tr>
+                                        <th class="px-3 py-2 whitespace-nowrap border-r border-gray-200 dark:border-gray-700 sticky left-0 z-10 bg-gray-50 dark:bg-gray-800 text-left">Day</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">08:00</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">08:55</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">09:50</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">10:45</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">11:40</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">12:35</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900/50">
+                                            <svg class="w-3 h-3 text-gray-400 mx-auto" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
+                                        </th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">14:00</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">14:55</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">15:50</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">16:45</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 font-mono">17:40</th>
+                                        <th class="px-2 py-2 whitespace-nowrap text-center font-mono">18:35</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="room-timetable-body" class="divide-y divide-gray-200 dark:divide-gray-700">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div id="notes-forum" class="hidden page-section">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
+                            <i data-lucide="message-square" class="mr-3 h-6 w-6 text-indigo-500"></i> Notes Forum
+                        </h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Share materials, ask questions, and collaborate with your peers.</p>
+                    </div>
+                    <button id="nf-create-post-btn" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors flex items-center shadow-sm">
+                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i> Create Post
+                    </button>
+                </div>
+
+                <div id="notes-forum-app" class="max-w-4xl mx-auto mt-2">
+                    <div class="flex justify-center p-12"><i data-lucide="loader-2" class="animate-spin text-indigo-500 w-8 h-8"></i></div>
+                </div>
+            </div>
+
+            <div id="find-people" class="hidden page-section">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
+                            <i data-lucide="users" class="mr-3 h-6 w-6 text-indigo-500"></i> RoomieMatch
+                        </h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Find your perfect roommate based on your lifestyle.</p>
+                    </div>
+                </div>
+                <div id="roomie-match-app" class="max-w-2xl mx-auto mt-4"></div>
+            </div>
+
+            <div id="task-hub" class="hidden page-section">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
+                            <i data-lucide="check-square" class="mr-3 h-6 w-6 text-indigo-500"></i> Task Hub
+                        </h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your assignments, projects, and studies.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <input type="text" id="task-title" placeholder="Task description..." class="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 dark:text-white font-medium">
+                        <select id="task-category" class="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 dark:text-white">
+                            <option value="Assignments">Assignment</option>
+                            <option value="Topics to Study">Topic to Study</option>
+                            <option value="Lab Experiments">Lab Experiment</option>
+                            <option value="Projects">Project Milestone</option>
+                        </select>
+                        <select id="task-course-link" class="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 dark:text-white">
+                            <option value="">Link Course (Optional)</option>
+                        </select>
+                        <button id="add-task-btn" class="bg-indigo-600 text-white rounded-xl px-4 py-3 font-bold hover:bg-indigo-700 transition-colors shadow-sm flex justify-center items-center gap-2">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Add Task
+                        </button>
+                    </div>
+                </div>
+
+                <div id="task-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                </div>
+            </div>
+
             <div id="extra" class="hidden page-section">
                 <div id="extra-calculator" class="extra-subsection"></div>
                 <div id="extra-directory" class="extra-subsection hidden">
@@ -355,7 +507,6 @@
                             <i data-lucide="shield" class="h-6 w-6 mr-2 text-indigo-500"></i> Secure Student Directory
                         </h3>
 
-                        <!-- Lock Screen: Visible initially -->
                         <div id="dir-lock-screen" class="space-y-4">
                             <div class="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 mb-4">
                                 <p class="text-sm text-yellow-700 dark:text-yellow-300">
@@ -381,9 +532,7 @@
                             </button>
                         </div>
 
-                        <!-- Search Screen: Hidden initially -->
                         <div id="dir-search-screen" class="space-y-4 hidden">
-                            <!-- UPDATED: Solid Background for Key Active Indicator -->
                             <div
                                 class="flex justify-between items-center bg-green-100 dark:bg-green-900 px-3 py-2 rounded-lg border border-green-200 dark:border-green-700">
                                 <span
@@ -418,10 +567,8 @@
                 <div id="profile-container"></div>
             </div>
 
-            <!-- CHAT SECTION: Dynamic Loading Container -->
             <div id="chat" class="hidden page-section h-full flex flex-col">
                 <div id="chat-content-area" class="h-full">
-                    <!-- chat_content.html will be injected here via JS -->
                 </div>
             </div>
 
@@ -444,7 +591,10 @@
         </div>
     </div>
 
-    <!-- LOCAL ALPINE JS -->
+    <script>
+        window.FIREBASE_CONFIG = {{ firebase_config | default('null') | tojson | safe }};
+    </script>
+
     <script src="{{ url_for('static', filename='alpine.js') }}" defer></script>
     <script>
         const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -455,7 +605,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
-                .register('/sw.js') // Root scope
+                .register('/sw.js')
                 .then(() => { console.log('Service Worker Registered'); });
         }
     </script>
