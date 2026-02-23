@@ -507,25 +507,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // Force fetch profile to make sure we have the latest room details
-            const profileData = state.cachedProfile || await Data.fetchAndDisplay(TARGETS.PROFILE, null, "Profile", {}, true);
-            
-            if (!profileData || !profileData.hostel || !profileData.hostel.room) {
-                chatUI.messages.innerHTML = '<div class="text-center p-10"><div class="bg-gray-100 dark:bg-gray-800 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4"><i data-lucide="home" class="h-10 w-10 text-gray-400"></i></div><h4 class="font-bold text-gray-800 dark:text-white text-lg">Hostel Profile Required</h4><p class="text-sm text-gray-500 mt-2 max-w-sm mx-auto">Could not find room details in your VTOP profile. Chat is strictly limited to verified hostellers.</p></div>';
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-                return;
+            // Safely get profile data (direct fetch if cached is missing to prevent UI overlap)
+            let profileData = state.cachedProfile;
+            if (!profileData) {
+                try {
+                    const res = await fetch(`${API_BASE_URL}/get-profile`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id') })
+                    });
+                    const d = await res.json();
+                    if (d.status === 'success') {
+                        profileData = d.data || d.profile || d;
+                        state.cachedProfile = profileData;
+                    }
+                } catch(e) { console.error("Chat Profile Fetch:", e); }
             }
+            
+            profileData = profileData || {};
+            const personal = profileData.personal || {};
 
-            const { hostel, personal } = profileData;
-            // Normalize room string to create a predictable supabase channel ID
-            const roomId = `${hostel.block}-${hostel.room}`.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toUpperCase();
-            currentChatRoomId = roomId;
-
-            // Extract Registration Number accurately (Fallbacks depending on API response shape)
+            // Extract Registration Number accurately
             const myRegNo = personal?.registerNumber || profileData?.registerNumber || personal?.app_no || 'UNKNOWN_REG';
 
-            chatUI.title.textContent = `Room ${hostel.room}`;
-            chatUI.subtitle.textContent = `Block ${hostel.block}`;
+            let roomTitle, roomSub, roomId;
+
+            // If hostel info exists, use Roommate Chat. Otherwise, gracefully fallback to Global Chat.
+            if (profileData.hostel && profileData.hostel.room) {
+                const hostel = profileData.hostel;
+                roomId = `${hostel.block || 'BLK'}-${hostel.room}`.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toUpperCase();
+                roomTitle = `Room ${hostel.room}`;
+                roomSub = `Block ${hostel.block || 'Unknown'}`;
+            } else {
+                roomId = 'CAMPUS-LOUNGE';
+                roomTitle = 'Campus Lounge';
+                roomSub = 'Global Community Chat';
+            }
+
+            currentChatRoomId = roomId;
+            chatUI.title.textContent = roomTitle;
+            chatUI.subtitle.textContent = roomSub;
 
             if (!supabaseClient) {
                 supabaseClient = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.key);
