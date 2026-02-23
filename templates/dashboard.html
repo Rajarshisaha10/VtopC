@@ -603,6 +603,12 @@
     <script src="{{ url_for('static', filename='calculator.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='dashboard.js') }}?v=8"></script>
     <script>
+        window.FIREBASE_CONFIG = {{ firebase_config | tojson | safe }};
+        window.SUPABASE_CONFIG = {{ supabase_config | tojson | safe }};
+    </script>
+
+    <script src="{{ url_for('static', filename='dashboard.js') }}" type="module"></script>
+    <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
                 .register('/sw.js')
