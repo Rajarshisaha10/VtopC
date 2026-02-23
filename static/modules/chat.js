@@ -3,7 +3,12 @@ import { API_BASE_URL } from './constants.js';
 let supabaseClient = null;
 let currentChatRoomId = null;
 let chatSubscription = null;
+let currentUserName = "User"; // Actual student name
 
+/**
+ * Initializes the Roommate Chat by fetching profile data (mimicking the fork's logic),
+ * parsing room info + student name, and connecting to Supabase via a secure JWT.
+ */
 export async function initRoommateChat() {
     const chatUI = {
         messages: document.getElementById('chat-messages'),
@@ -19,7 +24,12 @@ export async function initRoommateChat() {
 
     if (!chatUI.messages) return;
 
-    chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-400"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Locating your room...</p></div>';
+    // Loading State
+    chatUI.messages.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-full text-gray-400 space-y-3">
+            <i data-lucide="loader" class="animate-spin h-8 w-8 text-indigo-500"></i>
+            <p class="text-sm font-medium italic">Fetching profile & room details...</p>
+        </div>`;
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
     if (!window.SUPABASE_CONFIG || !window.SUPABASE_CONFIG.url || !window.SUPABASE_CONFIG.key) {
@@ -31,7 +41,7 @@ export async function initRoommateChat() {
         const sessionId = localStorage.getItem('vtop_session_id');
 
         // =====================================================
-        // 1. FETCH & PARSE PROFILE HTML (Like room_manager.js)
+        // 1. ROBUST PROFILE FETCH (Matches the Room Manager Fork)
         // =====================================================
         const profileRes = await fetch(`${API_BASE_URL}/fetch-data`, {
             method: 'POST',
@@ -42,12 +52,20 @@ export async function initRoommateChat() {
         
         let block = null;
         let roomNo = null;
+        let studentName = localStorage.getItem('vtop_username_cache') || "User";
         let regNo = localStorage.getItem('vtop_username_cache') || "UNKNOWN";
         regNo = regNo.trim().toUpperCase();
 
         if (profileData.status === 'success' && profileData.html_content) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(profileData.html_content, 'text/html');
+            
+            // Extract Actual Name (Exactly like the fork)
+            const nameEl = doc.querySelector('h3.text-xl.font-bold');
+            if (nameEl) studentName = nameEl.textContent.trim();
+            currentUserName = studentName;
+
+            // Extract Hostel Info via Spans (Exactly like the fork)
             const spans = doc.querySelectorAll('span');
             spans.forEach(span => {
                 const text = span.textContent.trim();
@@ -57,9 +75,13 @@ export async function initRoommateChat() {
         }
 
         // =====================================================
-        // 2. FETCH SECURE JWT TOKEN (Bypassing session check)
+        // 2. FETCH SECURE JWT TOKEN (Passing parsed data)
         // =====================================================
-        chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-gray-400"><i data-lucide="shield" class="animate-pulse h-8 w-8 mb-2 text-indigo-500"></i><p>Authenticating connection...</p></div>';
+        chatUI.messages.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-full text-gray-400 space-y-3">
+                <i data-lucide="shield" class="animate-pulse h-8 w-8 text-indigo-500"></i>
+                <p class="text-sm font-medium italic">Establishing secure room connection...</p>
+            </div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         const tokenRes = await fetch(`${API_BASE_URL}/get-chat-token`, {
@@ -68,31 +90,37 @@ export async function initRoommateChat() {
             body: JSON.stringify({ 
                 session_id: sessionId,
                 reg_no: regNo,
+                user_name: studentName,
                 block: block,
                 room_no: roomNo
             })
         });
         const tokenData = await tokenRes.json();
 
-        // 3. ERROR OUT GRACEFULLY IF NO ROOM IS ASSIGNED
+        // 3. ENFORCE ROOM CHECK (Strictly block if no room)
         if (tokenData.status !== 'success' || !tokenRes.ok) {
             chatUI.messages.innerHTML = `
-                <div class="p-10 flex flex-col items-center text-center">
-                    <div class="bg-gray-100 dark:bg-gray-800 rounded-full h-20 w-20 flex items-center justify-center mx-auto mb-4"><i data-lucide="home" class="h-10 w-10 text-gray-400"></i></div>
-                    <p class="text-gray-800 dark:text-gray-200 font-bold text-lg">Roommate Chat Unavailable</p>
-                    <p class="text-sm text-gray-500 mt-2 max-w-sm mx-auto">${tokenData.message || "Failed to find hostel room assignment."}</p>
+                <div class="p-10 flex flex-col items-center text-center max-w-sm mx-auto">
+                    <div class="bg-gray-100 dark:bg-gray-800 rounded-full h-20 w-20 flex items-center justify-center mb-4">
+                        <i data-lucide="lock" class="h-10 w-10 text-gray-400"></i>
+                    </div>
+                    <p class="text-gray-800 dark:text-gray-200 font-bold text-lg">Chat Restricted</p>
+                    <p class="text-xs text-gray-500 mt-2 leading-relaxed">
+                        Roommate chat is restricted to users with a verified hostel room in VTOP. 
+                        ${tokenData.message ? `<br><span class="text-red-400 mt-1 block font-mono">${tokenData.message}</span>` : ''}
+                    </p>
                 </div>`;
             if (typeof lucide !== 'undefined') lucide.createIcons();
             return;
         }
 
-        // 4. SUCCESSFUL ROOM FOUND - Update UI
+        // 4. SETUP SUCCESSFUL CONNECTION
         currentChatRoomId = tokenData.room_id;
         const myRegNo = tokenData.reg_no;
+        
         chatUI.title.textContent = `Room ${tokenData.room}`;
         chatUI.subtitle.textContent = `Block ${tokenData.block}`;
 
-        // Ensure token is formatted correctly (fixes PyJWT byte string issues)
         let secureToken = tokenData.token;
         if (typeof secureToken === 'string') {
             secureToken = secureToken.trim();
@@ -104,7 +132,7 @@ export async function initRoommateChat() {
         if (!supabaseClient) {
             supabaseClient = supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.key, {
                 global: { headers: { Authorization: `Bearer ${secureToken}` } },
-                accessToken: async () => secureToken // Required for Supabase v2 SDK stability
+                accessToken: async () => secureToken
             });
         } else {
             supabaseClient.rest.headers['Authorization'] = `Bearer ${secureToken}`;
@@ -113,6 +141,7 @@ export async function initRoommateChat() {
         supabaseClient.realtime.setAuth(secureToken);
         if (chatSubscription) chatSubscription.unsubscribe();
 
+        // Fetch History
         const { data: messages, error } = await supabaseClient
             .from('messages')
             .select('*')
@@ -120,28 +149,31 @@ export async function initRoommateChat() {
             .order('created_at', { ascending: true })
             .limit(50);
             
-        if (error) {
-            // Highly specific error catching to inform about .env configuration
-            if (error.message && (error.message.includes("No suitable key") || error.message.includes("wrong key type"))) {
-                throw new Error("Backend JWT Mismatch: Your SUPABASE_JWT_SECRET in your backend .env file is incorrect. Go to Supabase Dashboard -> Project Settings -> API -> JWT Settings to find your true JWT Secret.");
-            }
-            throw new Error("Access Denied: " + (error.message || "RLS Policy Blocked Request"));
-        }
+        if (error) throw new Error(error.message || "Failed to fetch history.");
 
+        // Render History
         chatUI.messages.innerHTML = '';
         if (messages && messages.length > 0) {
             messages.forEach(msg => appendMessageUI(msg, myRegNo, chatUI.messages));
         } else {
-            chatUI.messages.innerHTML = '<div class="flex flex-col items-center justify-center h-full opacity-50"><i data-lucide="shield-check" class="w-12 h-12 mb-3 text-emerald-500"></i><p class="italic text-sm text-gray-500 font-medium text-center">Connection secured.<br>No messages yet.</p></div>';
+            chatUI.messages.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full opacity-50 space-y-3">
+                    <i data-lucide="shield-check" class="w-12 h-12 text-emerald-500"></i>
+                    <p class="italic text-xs text-gray-500 font-medium text-center px-6">
+                        Welcome, ${studentName.split(' ')[0]}.<br>Only your roommates in ${tokenData.block}-${tokenData.room} can see this chat.
+                    </p>
+                </div>`;
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
+        // Subscription
         chatSubscription = supabaseClient
             .channel(`room-${currentChatRoomId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${currentChatRoomId}` }, 
             payload => appendMessageUI(payload.new, myRegNo, chatUI.messages))
             .subscribe();
 
+        // Listeners
         chatUI.sendBtn.onclick = () => handleSendMessage(chatUI, myRegNo);
         chatUI.input.onkeydown = (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -173,7 +205,12 @@ export async function initRoommateChat() {
 
     } catch (err) {
         console.error("Chat Init Error:", err);
-        chatUI.messages.innerHTML = `<div class="p-10 flex flex-col items-center text-center"><i data-lucide="lock" class="w-10 h-10 text-red-400 mb-3"></i><p class="text-red-500 font-medium">Security Error</p><p class="text-xs text-gray-500 mt-2 max-w-sm mx-auto break-words">${err.message}</p></div>`;
+        chatUI.messages.innerHTML = `
+            <div class="p-10 flex flex-col items-center text-center">
+                <i data-lucide="lock" class="w-10 h-10 text-red-400 mb-3"></i>
+                <p class="text-red-500 font-bold">Security Blocked</p>
+                <p class="text-[11px] text-gray-500 mt-2 max-w-sm mx-auto leading-relaxed">${err.message}</p>
+            </div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
@@ -209,7 +246,7 @@ async function handleSendMessage(ui, myRegNo) {
         const payload = {
             room_id: currentChatRoomId,
             user_id: String(myRegNo),
-            user_name: String(myRegNo),
+            user_name: String(currentUserName), // Using the student's actual name
             content: content
         };
         if (fileUrl) payload.file_url = fileUrl;
@@ -236,10 +273,8 @@ function appendMessageUI(msg, myRegNo, container) {
     const emptyState = container.querySelector('.opacity-50');
     if (emptyState) emptyState.remove();
 
-    // Determine layout based on sender: Right Side for me, Left Side for roommate
     const isMe = msg.user_id === myRegNo;
     const div = document.createElement('div');
-    // Flex justifies right or left based on sender
     div.className = `flex ${isMe ? 'justify-end' : 'justify-start'} animate-fade-in-up mb-4`;
     
     let displayFileName = msg.file_name || 'Attached Document';
