@@ -51,10 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- CORE LOGIC ---
+    let autoLoginRetryCount = 0;
+    const MAX_RETRIES = 5;
     
     async function preFetchCaptcha(isRetry = false, isAutoLoginCheck = false) {
         try {
-            const response = await fetch(`${API_BASE_URL}/start-login`, { method: 'POST' });
+            const response = await fetch(`${API_BASE_URL}/start-login`, { 
+                method: 'POST',
+                credentials: 'include'
+            });
             if (!response.ok) throw new Error(`Server error: ${response.status}`);
             const data = await response.json();
 
@@ -62,12 +67,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionIdInput.value = data.session_id;
                 captchaImageContainer.innerHTML = `<img src="${data.captcha_image_data}" alt="CAPTCHA"/>`;
                 
+                // The backend confirms we have a valid cookie saved
+                const shouldAutoLogin = isAutoLoginCheck && data.has_saved_creds;
+                
                 try {
                     const solvedText = await solveCaptchaClient(data.captcha_image_data);
                     captchaInput.value = solvedText;
                     console.log("Captcha solved in background:", solvedText);
                     
-                    if (isAutoLoginCheck && data.has_saved_creds) {
+                    if (shouldAutoLogin) {
                         updateLoadingText("Verifying saved credentials...");
                         await handleAutoLogin(solvedText);
                     } else {
@@ -86,8 +94,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                 } catch (solveError) {
                     console.error('CAPTCHA solve error:', solveError);
-                    if (isAutoLoginCheck) showLoginScreen();
-                    if (!isRetry) preFetchCaptcha(true, false);
+                    
+                    // THE FIX: Do not give up easily on Auto-Login! 
+                    if (shouldAutoLogin && autoLoginRetryCount < MAX_RETRIES) {
+                        autoLoginRetryCount++;
+                        updateLoadingText(`Solving CAPTCHA... (${autoLoginRetryCount}/${MAX_RETRIES})`);
+                        preFetchCaptcha(true, true);
+                    } else {
+                        if (isAutoLoginCheck) showLoginScreen();
+                        preFetchCaptcha(true, false);
+                    }
                 }
 
             } else {
@@ -105,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (!savedSessionId) {
             updateLoadingText("Initializing secure session...");
+            autoLoginRetryCount = 0; // Reset loop counter
             preFetchCaptcha(false, true); 
             return;
         }
@@ -113,7 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE_URL}/check-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: savedSessionId })
+                body: JSON.stringify({ session_id: savedSessionId }),
+                credentials: 'include'
             });
 
             if (!response.ok) throw new Error('Session validation failed.');
@@ -124,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 localStorage.removeItem('vtop_session_id');
                 updateLoadingText("Session expired. Re-initializing...");
+                autoLoginRetryCount = 0; // Reset loop counter
                 preFetchCaptcha(false, true); 
             }
         } catch (error) {
@@ -133,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             localStorage.removeItem('vtop_session_id');
             updateLoadingText("Connection error. Retrying...");
+            autoLoginRetryCount = 0; // Reset loop counter
             preFetchCaptcha(false, true); 
         }
     }
@@ -145,26 +165,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ 
                     session_id: sessionIdInput.value,
                     captcha: captchaText 
-                }) 
+                }),
+                credentials: 'include' 
             });
             
             const data = await response.json();
+            
             if (data.status === 'success') {
                 updateLoadingText("Success! Entering dashboard...");
                 localStorage.setItem('vtop_session_id', data.session_id);
                 window.location.href = '/';
-            } else if (data.status === 'invalid_captcha') {
-                 console.log("Auto-login captcha failed, retrying...");
-                 preFetchCaptcha(true, true);
+                
+            } else if (data.status === 'invalid_captcha' || data.status === 'error') {
+                 // THE FIX: If VTOP throws a random error or rejects the CAPTCHA, try again!
+                 console.log("Auto-login error or captcha failed, retrying...");
+                 if (autoLoginRetryCount < MAX_RETRIES) {
+                     autoLoginRetryCount++;
+                     updateLoadingText(`VTOP sync retry... (${autoLoginRetryCount}/${MAX_RETRIES})`);
+                     setTimeout(() => preFetchCaptcha(true, true), 1000);
+                 } else {
+                     showLoginScreen();
+                     setStatus("Auto-login timed out. Please log in manually.", true);
+                     preFetchCaptcha(false, false);
+                 }
+                 
             } else {
+                // Only stop trying if the password actually changed or the account is locked.
                 showLoginScreen();
                 setStatus(data.message, true); 
                 preFetchCaptcha(false, false); 
             }
+            
         } catch (e) {
-            showLoginScreen();
-            setStatus("Auto-login failed. Please log in manually.", true);
-            preFetchCaptcha(false, false);
+            if (autoLoginRetryCount < MAX_RETRIES) {
+                autoLoginRetryCount++;
+                updateLoadingText(`Network hiccup. Retrying... (${autoLoginRetryCount}/${MAX_RETRIES})`);
+                setTimeout(() => preFetchCaptcha(true, true), 1000);
+            } else {
+                showLoginScreen();
+                setStatus("Auto-login failed. Please log in manually.", true);
+                preFetchCaptcha(false, false);
+            }
         }
     }
 
@@ -183,7 +224,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE_URL}/login-attempt`, { 
                 method: 'POST', 
                 headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify(payload) 
+                body: JSON.stringify(payload),
+                credentials: 'include'
             });
             
             const data = await response.json();

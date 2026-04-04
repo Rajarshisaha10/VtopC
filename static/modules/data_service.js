@@ -2,24 +2,12 @@ import { API_BASE_URL, TARGETS } from './constants.js';
 import { state } from './state.js';
 import * as UI from './ui.js';
 
-/**
- * Generates a unique storage key based on the target and parameters.
- * Ensures Dashboard and Detail views share the same data source.
- */
 function getStorageKey(target, params = {}) {
-    // Base key using target and semester
     let key = `vtop_cache_${target}_${state.currentSemesterId || 'default'}`;
-
-    // Append specific parameters to differentiate (e.g. Calendar months)
     if (params.calDate) key += `_${params.calDate}`;
-
     return key;
 }
 
-/**
- * Attempts to load and render data from LocalStorage.
- * Returns true if data was found and rendered, false otherwise.
- */
 function loadFromCache(target, container, params) {
     const cacheKey = getStorageKey(target, params);
     const cachedString = localStorage.getItem(cacheKey);
@@ -30,14 +18,10 @@ function loadFromCache(target, container, params) {
             console.log(`[Cache] Hit for ${target}`);
 
             if (container) {
-                // Render the cached HTML immediately
                 container.innerHTML = cachedData.html_content;
-
-                // Re-initialize icons since we injected new HTML
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
 
-            // Restore Application State from Cache
             if (target === TARGETS.ATTENDANCE && cachedData.raw_data) {
                 state.setAttendance(cachedData.raw_data);
             }
@@ -51,71 +35,56 @@ function loadFromCache(target, container, params) {
             return true;
         } catch (e) {
             console.error("[Cache] Parse error", e);
-            // If cache is corrupted, remove it
             localStorage.removeItem(cacheKey);
         }
     }
     return false;
 }
 
-/**
- * Handles fetch errors.
- * If content was already loaded from cache, we fail silently or show a toast.
- * If screen is empty, we show the error message.
- */
 function handleFetchError(error, container, target, params) {
     console.warn('[Network] Fetch failed:', error);
 
-    // Check if container already has content (from cache)
+    // THE FIX: If the server rejects the fetch (dead session), force auto-login!
+    if (error.message.includes("SERVER_REJECTED") || error.message.includes("Session expired") || error.message.includes("401") || error.message.includes("400")) {
+        console.warn("Backend rejected the request. Session likely dead. Triggering re-login.");
+        localStorage.removeItem('vtop_session_id');
+        window.location.href = '/login';
+        return; 
+    }
+
     const isContentVisible = container && !container.innerHTML.includes('animate-spin');
 
     if (isContentVisible) {
         console.log('[Network] keeping cached data visible.');
-
-        if (error.message.includes("Session expired")) {
-            localStorage.removeItem('vtop_session_id');
-            window.location.href = '/login';
-        }
     } else {
         if (loadFromCache(target, container, params)) {
             return;
         }
 
         if (container) {
-            if (error.message.includes("Session expired")) {
-                localStorage.removeItem('vtop_session_id');
-                window.location.href = '/login';
-            } else {
-                container.innerHTML = `
-                    <div class="p-8 text-center">
-                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
-                            <i data-lucide="wifi-off" class="w-6 h-6 text-red-600 dark:text-red-400"></i>
-                        </div>
-                        <p class="text-gray-600 dark:text-gray-300 font-medium mb-2">Connection Failed</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Unable to load data.</p>
-                        <button onclick="location.reload()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg text-sm transition-colors">Retry</button>
-                    </div>`;
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-            }
+            container.innerHTML = `
+                <div class="p-8 text-center">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+                        <i data-lucide="wifi-off" class="w-6 h-6 text-red-600 dark:text-red-400"></i>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300 font-medium mb-2">Connection Failed</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Unable to load data.</p>
+                    <button onclick="location.reload()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg text-sm transition-colors">Retry</button>
+                </div>`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
     }
 }
 
-/**
- * Primary Data Fetcher with Stale-While-Revalidate Strategy.
- * Modified to support returning raw data (returnDataOnly) for background tasks like Chat initialization.
- */
 export async function fetchAndDisplay(target, containerElement, title, extraParams = {}, returnDataOnly = false) {
     if (!containerElement && !returnDataOnly) return;
 
     let hasCachedData = false;
     let cachedObject = null;
 
-    // STEP 1: Show Cache First (Instant Load)
     if (containerElement && !returnDataOnly) {
         hasCachedData = loadFromCache(target, containerElement, extraParams);
     } else if (returnDataOnly) {
-        // Extract cache data silently if we just need the raw data (e.g., Profile logic)
         const cachedStr = localStorage.getItem(getStorageKey(target, extraParams));
         if (cachedStr) {
             try { 
@@ -126,7 +95,6 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         }
     }
 
-    // STEP 2: Show Loading State (Only if no cache found)
     if (!hasCachedData && containerElement && !returnDataOnly) {
         containerElement.innerHTML = `
             <div class="flex flex-col items-center justify-center py-12">
@@ -136,7 +104,6 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    // STEP 3: Check Online Status
     if (!navigator.onLine) {
         if (!hasCachedData && containerElement && !returnDataOnly) {
             containerElement.innerHTML = `<div class="p-6 text-center"><p class="text-gray-500">No data available offline.</p></div>`;
@@ -144,7 +111,6 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         return cachedObject;
     }
 
-    // STEP 4: Network Fetch (Background Refresh)
     try {
         const currentSessionId = localStorage.getItem('vtop_session_id');
         const payload = {
@@ -154,22 +120,19 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
             ...extraParams
         };
 
-        // Standard /fetch-data call 
         const response = await fetch(`${API_BASE_URL}/fetch-data`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-            if (response.status === 401) throw new Error("Session expired.");
-            throw new Error(`Server error ${response.status}`);
-        }
+        // THE FIX: Explicitly mark server rejections
+        if (!response.ok) throw new Error("SERVER_REJECTED: HTTP " + response.status);
 
         const data = await response.json();
 
+        // THE FIX: Catch logical failures gracefully
         if (data.status === 'success') {
-            // Handle Auto-Semester Switch
             if (data.new_semester_id && data.new_semester_id !== state.currentSemesterId) {
                 console.log(`[Data] Auto-switching semester to ${data.new_semester_id}`);
                 state.setSemesterId(data.new_semester_id);
@@ -178,47 +141,37 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
                 if (semSelect) semSelect.value = data.new_semester_id;
             }
 
-            // Update UI with fresh data
             if (containerElement && !returnDataOnly) {
                 containerElement.innerHTML = data.html_content;
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
 
-            // Update Runtime State
             if (target === TARGETS.ATTENDANCE && data.raw_data) state.setAttendance(data.raw_data);
             if (target === TARGETS.TIMETABLE && data.raw_data) state.setTimetable(data.raw_data.timetable);
             
-            // --- TEMPORARY OVERRIDE FOR CHAT TESTING ---
             if (target === TARGETS.PROFILE || target === 'student/studentProfileView') {
                 const regNo = localStorage.getItem('vtop_regno_cache') || 'TEST_USER';
-                
-                // Force a fake profile specifically to test the chat room
                 const mockProfile = {
                     personal: { app_no: regNo, name: regNo },
                     hostel: { block: 'Test-Block', room: 'Test-Room' }
                 };
-                
                 state.cachedProfile = mockProfile;
                 data.data = mockProfile;
                 data.raw_data = mockProfile;
             }
 
-            // Save to Persistent Cache
             try {
                 localStorage.setItem(getStorageKey(target, extraParams), JSON.stringify(data));
                 console.log(`[Cache] Updated ${target}`);
             } catch (e) { console.warn("Cache save failed", e); }
 
-            // Return data object so background callers (like Chat) can use it
             return data.data || data.raw_data || data;
 
         } else {
-            throw new Error(data.message);
+            throw new Error("SERVER_REJECTED: " + (data.message || "Session Expired"));
         }
 
     } catch (error) {
-        
-        // --- FALLBACK FOR CHAT: Force a test profile if fetch failed ---
         if (target === TARGETS.PROFILE || target === 'student/studentProfileView') {
             console.warn("Profile fetch failed, enforcing TEST ROOM fallback for chat.");
             const regNo = localStorage.getItem('vtop_regno_cache') || 'TEST_USER';
@@ -236,8 +189,6 @@ export async function fetchAndDisplay(target, containerElement, title, extraPara
         return cachedObject;
     }
 }
-
-// --- Specialized Fetchers for Dashboard Pre-loading ---
 
 export async function fetchAttendanceForCache() {
     const target = TARGETS.ATTENDANCE;
@@ -260,7 +211,6 @@ export async function fetchAttendanceForCache() {
         if (data.status === 'success') {
             state.setAttendance(data.raw_data);
             localStorage.setItem(getStorageKey(target), JSON.stringify(data));
-            console.log('[Cache] Pre-fetched Attendance');
         }
     } catch (e) { console.warn(e); }
 }
@@ -280,14 +230,13 @@ export async function fetchTimetableForCache() {
                 session_id: localStorage.getItem('vtop_session_id'),
                 target: target,
                 semesterSubId: state.currentSemesterId,
-                isSaturday: new Date().getDay() === 6 // Check client-side time
+                isSaturday: new Date().getDay() === 6
             })
         });
         const data = await response.json();
         if (data.status === 'success') {
             state.setTimetable(data.raw_data.timetable);
             localStorage.setItem(getStorageKey(target), JSON.stringify(data));
-            console.log('[Cache] Pre-fetched Timetable');
         }
     } catch (e) { console.warn(e); }
 }
@@ -301,7 +250,6 @@ export async function fetchAndCalculateAttendanceSnapshot() {
         UI.updateAttendanceSnapshot(rawData);
     };
 
-    // 1. Cache First
     const c = localStorage.getItem(getStorageKey(target));
     if (c) {
         updateWidget(JSON.parse(c).raw_data);
@@ -312,7 +260,6 @@ export async function fetchAndCalculateAttendanceSnapshot() {
 
     if (!navigator.onLine) return;
 
-    // 2. Network
     try {
         const response = await fetch(`${API_BASE_URL}/fetch-data`, {
             method: 'POST',
@@ -361,7 +308,6 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
         if (typeof lucide !== 'undefined') lucide.createIcons();
     };
 
-    // 1. Try Cache First
     const cacheKey = getStorageKey(target);
     const cachedString = localStorage.getItem(cacheKey);
     let hasCache = false;
@@ -375,7 +321,6 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
         } catch (e) { console.error(e); }
     }
 
-    // 2. Check Online
     if (!navigator.onLine) {
         if (!hasCache && todayScheduleContainer) {
             todayScheduleContainer.innerHTML = '<p class="text-sm text-gray-500">No offline data.</p>';
@@ -383,7 +328,6 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
         return;
     }
 
-    // 3. Loading UI
     const loadingHTML = `<div class="p-8 text-center text-gray-500 flex flex-col items-center justify-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mb-2 text-indigo-500"></i><p>Loading data...</p></div>`;
 
     if (!hasCache) {
@@ -393,31 +337,37 @@ export async function fetchTimetableAndCourses(coursesContainer, timetableContai
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    // 4. Network Fetch
     try {
         const payload = {
             session_id: localStorage.getItem('vtop_session_id'),
             target: target,
             semesterSubId: state.currentSemesterId,
-            includeDayOrder: !!timetableContainer, // Request day order check ONLY if showing full timetable
-            isSaturday: new Date().getDay() === 6 // Check client-side time
+            includeDayOrder: !!timetableContainer, 
+            isSaturday: new Date().getDay() === 6 
         };
         console.log("[Debug] Fetching data with payload:", payload);
-        console.log("[Debug] Client-side isSaturday:", payload.isSaturday, "Day:", new Date().getDay());
 
         const response = await fetch(`${API_BASE_URL}/fetch-data`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+        
+        // THE FIX: Explicitly throw on server rejection
+        if (!response.ok) throw new Error("SERVER_REJECTED: HTTP " + response.status);
+        
         const data = await response.json();
+        
         if (data.status === 'success') {
             renderData(data);
             localStorage.setItem(cacheKey, JSON.stringify(data));
-        } else throw new Error(data.message);
+        } else {
+            throw new Error("SERVER_REJECTED: " + data.message);
+        }
     } catch (error) {
         console.error(error);
-        if (!hasCache) handleFetchError(error, timetableContainer || coursesContainer, target, {});
+        // THE FIX: Handle the error even if cache exists, so it triggers logout!
+        handleFetchError(error, timetableContainer || coursesContainer, target, {});
     }
 }
 
