@@ -2,16 +2,15 @@ import { API_BASE_URL, TARGETS } from './modules/constants.js';
 import { state } from './modules/state.js';
 import * as UI from './modules/ui.js';
 import * as Data from './modules/data_service.js';
-import { initRoommateChat } from './modules/chat.js'; // Added Import
-import * as RoomManager from './modules/room_manager.js'; // Your import
-import * as RoomieMatch from './modules/roomie_match.js'; // Your import
-import * as NotesForum from './modules/notes_forum.js';   // Your import
-import * as TaskManager from './modules/task_manager.js'; // Your import
+import { initRoommateChat } from './modules/chat.js'; 
+import * as RoomManager from './modules/room_manager.js'; 
+import * as RoomieMatch from './modules/roomie_match.js'; 
+import * as NotesForum from './modules/notes_forum.js';   
+import * as TaskManager from './modules/task_manager.js'; 
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded. Version: Modular Secure Chat");
 
-    // Watchdog for slow loads
     setTimeout(() => {
         const scheduleEl = document.getElementById('today-schedule-container');
         const snapshotEl = document.getElementById('snapshot-attendance-perc');
@@ -26,7 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 10000); 
 
-    // Directory State
     let decryptedStudentList = [];
     let isDirectoryUnlocked = false;
 
@@ -173,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (section === 'enrollment' && elements.enrollment && Data && Data.fetchAndDisplay) Data.fetchAndDisplay(TARGETS.ENROLLMENT, elements.enrollment, "Course Enrollment");
             else if (section === 'profile' && Data && Data.fetchAndDisplay) Data.fetchAndDisplay(TARGETS.PROFILE, elements.profile, "Profile");
             
-            // --- Handle Chat Request ---
             if (section === 'chat') {
                 const container = elements.chatContentArea;
                 if (!document.getElementById('chat-container')) {
@@ -187,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                 }
-                initRoommateChat(); // Clean call to our new modular logic
+                initRoommateChat(); 
             }
 
             else if (section === 'find-people') RoomieMatch.initRoomieMatch();
@@ -290,7 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Directory Logic ---
     if (elements.dirTogglePassword) {
         elements.dirTogglePassword.addEventListener('click', () => {
             const type = elements.dirPassword.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -443,10 +439,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof lucide !== 'undefined') lucide.createIcons();
         });
     }
-
-    // ============================================================
-    // --- System Init & Checks ---
-    // ============================================================
     
     function loadCachedData() {
         const cachedName = localStorage.getItem('vtop_username_cache');
@@ -506,6 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // THE FIX: If VTOP rejects the semester fetch (meaning the session is dead), forcefully log out!
     async function populateSemesterDropdown(triggerRefresh = false) {
         try {
             const response = await fetch(`${API_BASE_URL}/get-semesters`, { 
@@ -513,6 +506,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ session_id: localStorage.getItem('vtop_session_id') }) 
             });
+            
+            if (!response.ok) throw new Error("SERVER_REJECTED");
             const data = await response.json();
             
             if (data.status === 'success' && data.semesters && data.semesters.length > 0) {
@@ -534,10 +529,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if(state && state.setSemesterId) state.setSemesterId(selectedId);
                 localStorage.setItem('vtop_semester_id', selectedId);
+            } else {
+                throw new Error("SERVER_REJECTED");
             }
         } catch (error) {
+            if (error.message.includes("SERVER_REJECTED")) {
+                console.warn("VTOP session dead. Forcing relogin.");
+                localStorage.removeItem('vtop_session_id');
+                window.location.href = '/login';
+                return; // Prevent further refreshing
+            }
         } finally {
-            if (triggerRefresh) {
+            if (triggerRefresh && localStorage.getItem('vtop_session_id')) {
                 refreshCurrentPage();
             }
         }
