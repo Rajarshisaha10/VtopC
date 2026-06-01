@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - VtopC</title>
+    <meta name="description" content="Privacy Policy for VtopC.">
+    <script src="{{ url_for('static', filename='tailwind.js') }}"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script src="{{ url_for('static', filename='lucide.js') }}"></script>
+</head>
+
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 min-h-screen">
+    <main class="max-w-4xl mx-auto px-5 py-10">
+        <a href="{{ url_for('login') }}" class="inline-flex items-center text-sm text-indigo-600 dark:text-indigo-400 hover:underline mb-6">
+            <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i> Back to VtopC
+        </a>
+
+        <article class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6 sm:p-8">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Last updated: June 1, 2026</p>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">Privacy Policy</h1>
+            <p class="text-gray-600 dark:text-gray-300 mb-6">
+                VtopC is an independent student dashboard made by AIP. This Privacy Policy explains how the application handles information when you use it to access VTOP-related academic data.
+            </p>
+
+            <section class="space-y-5 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Information We Process</h2>
+                    <p>When you log in, VtopC processes your VTOP username, password, CAPTCHA result, session identifier, academic records, timetable, attendance, marks, exam schedule, profile details, and related dashboard data needed to provide the service. We do not track users across sessions, create behavioral profiles, or share analytics with any third party beyond what third-party services handle under their own policies.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">How Information Is Stored</h2>
+                    <p>VTOP session data is stored temporarily in server memory. Your browser's local storage stores settings, preferences, selected semester, cached dashboard data, and session identifiers—this data never leaves your device. Login credentials may be stored in an HttpOnly cookie to support optional auto-login. All stored data can be manually cleared anytime through your browser or within the app.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">How Information Is Used</h2>
+                    <p>Information is used solely to authenticate with VTOP, fetch your academic data, display dashboard features, calculate attendance insights, maintain session continuity, and improve your user experience. We do not use data for profiling, marketing, or any purpose beyond providing the core service.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Analytics and Cookies</h2>
+                    <p>VtopC may use analytics services provided by third parties like Google and Vercel for performance monitoring and educational purposes only. These services operate under their own privacy policies. Analytics data is used to understand usage patterns and improve the application, not to track individual users. You can clear all cookies in your browser settings at any time.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Notifications and Background Processes</h2>
+                    <p>VtopC does not send push notifications, background alerts, or maintain background processes that monitor your behavior. All notifications are displayed within the app interface only when you're actively using it.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Third-Party Services</h2>
+                    <p>VtopC communicates with VTOP systems to retrieve your academic data. Some optional features may use services such as Firebase, Supabase, or other configured backends. These services process data according to their own privacy policies, which we encourage you to review.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Data Sharing and Non-Monetization</h2>
+                    <p>VtopC is a free, non-commercial project. We do not sell, trade, or monetize any personal information. Data is sent only to VTOP and configured backend services as needed to deliver the features you've enabled. No data is shared with advertisers, marketing partners, or any other third parties for commercial purposes.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Open Source</h2>
+                    <p>VtopC is an open-source project created for learning and experimentation. The source code is publicly available for anyone to review, modify, and contribute to through the project's GitHub repository. Community contributions do not affect your privacy or transmit your data externally.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Your Privacy Choices</h2>
+                    <p>You can log out to clear the active server session and saved credentials. You can also clear your browser's local storage and cookies for this site to remove all cached data, preferences, and session information. These actions can be performed anytime through your browser settings or the app's interface.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Security</h2>
+                    <p>VtopC uses server-side sessions and HttpOnly cookies where applicable to protect your data. However, no system can guarantee absolute security. We recommend using VtopC only on trusted devices and networks, and you are responsible for keeping your VTOP credentials safe.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Disclaimer</h2>
+                    <p>VtopC is provided on an "as-is" basis with no guarantees of accuracy, reliability, or availability. We are not responsible for data inaccuracies, login failures, or service interruptions caused by VTOP updates or other external factors. Always verify critical information directly with VTOP or your institution.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Changes to This Policy</h2>
+                    <p>This Privacy Policy may be updated periodically to reflect improvements or changes in how we handle data. Continued use of VtopC after updates constitutes your acceptance of the revised policy.</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Contact</h2>
+                    <p>For privacy questions or concerns, contact the project maintainer identified as AIP through the official project channel where VtopC is distributed.</p>
+                </div>
+            </section>
+        </article>
+    </main>
+
+    <script>
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    </script>
+</body>
+
+</html>

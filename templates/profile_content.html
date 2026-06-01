@@ -185,45 +185,6 @@
             {% endif %}
 
         </div>
-        
-        <div class="xl:col-span-3 mt-2">
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden" id="credentials-container">
-                <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-                    <h3 class="font-bold text-gray-900 dark:text-white flex items-center text-md">
-                        <i data-lucide="lock" class="w-5 h-5 mr-2 text-yellow-500"></i> Credentials & Exam Schedule
-                    </h3>
-                    <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">
-                        Confidential
-                    </span>
-                </div>
-                
-                <div id="creds-locked" class="p-10 flex flex-col items-center justify-center text-center bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm">
-                    <div class="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4">
-                        <i data-lucide="shield-lock" class="w-8 h-8 text-gray-400 dark:text-gray-500"></i>
-                    </div>
-                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">This section is locked</h4>
-                    <p class="text-gray-500 dark:text-gray-400 text-sm mb-6 max-w-md">
-                        To view your account credentials and upcoming exam schedule, please verify your identity by entering your VTOP password.
-                    </p>
-                    
-                    <div class="w-full max-w-xs">
-                        <div class="relative">
-                            <input type="password" id="creds-password-input" 
-                                   class="block w-full px-4 py-2.5 pr-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" 
-                                   placeholder="Enter VTOP Password">
-                        </div>
-                        <button onclick="unlockCredentials()" id="creds-unlock-btn"
-                                class="mt-3 w-full text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-indigo-600 dark:hover:bg-indigo-700 dark:focus:ring-indigo-800 transition-colors flex items-center justify-center">
-                            <i data-lucide="key" class="w-4 h-4 mr-2"></i> Unlock Details
-                        </button>
-                        <p id="creds-error" class="mt-2 text-xs text-red-600 dark:text-red-400 hidden"></p>
-                    </div>
-                </div>
-
-                <div id="creds-content" class="hidden">
-                    </div>
-            </div>
-        </div>
     </div>
 </section>
 <script>

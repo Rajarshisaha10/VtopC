@@ -10,7 +10,6 @@ load_dotenv()
 # Import blueprints
 from auth import auth_bp
 from data_routes import data_bp
-from chat_routes import chat_bp
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
@@ -24,7 +23,6 @@ app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/', prefix='static/')
 # Register blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(data_bp)
-app.register_blueprint(chat_bp)
 
 @app.route('/')
 @app.route('/dashboard')
@@ -39,22 +37,29 @@ def index():
         'appId': os.environ.get('FIREBASE_APP_ID')
     }
     
-    supabase_config = {
-        'url': os.environ.get('SUPABASE_URL', ''),
-        'anonKey': os.environ.get('SUPABASE_ANON_KEY', '')
-    }
-    
     return render_template('dashboard.html', 
-        firebase_config=firebase_config, 
-        supabase_config=supabase_config,
-        supabase_url=os.environ.get('SUPABASE_URL', ''),
-        supabase_key=os.environ.get('SUPABASE_KEY', '')
+        firebase_config=firebase_config
     )
 
 @app.route('/login')
 def login():
     """Serves the login page."""
     return render_template('login.html')
+
+@app.route('/legal')
+def legal():
+    """Serves the merged privacy policy and terms of service page."""
+    return render_template('legal.html')
+
+@app.route('/privacy-policy')
+def privacy_policy():
+    """Serves the privacy policy page."""
+    return render_template('legal.html')
+
+@app.route('/terms-of-service')
+def terms_of_service():
+    """Serves the terms of service page."""
+    return render_template('legal.html')
 
 @app.route('/sw.js')
 def service_worker():

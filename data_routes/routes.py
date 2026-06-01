@@ -1,4 +1,5 @@
 from flask import request, jsonify, render_template
+from bs4 import BeautifulSoup
 from . import data_bp
 from .utils import get_session_details
 from . import timetable, attendance, calendar, marks, exams, profile
@@ -70,6 +71,43 @@ def fetch_data():
         
         # If the error is something else, return 401 to trigger a clean re-login.
         return jsonify({'status': 'error', 'message': 'Session expired or invalid.'}), 401
+
+@data_bp.route('/fetch-vtop-content', methods=['POST'])
+def fetch_vtop_content():
+    data = request.json or {}
+    session_id = data.get('session_id')
+
+    try:
+        session, authorized_id, csrf_token, base_url = get_session_details(session_id)
+        headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': f"{base_url}/content"
+        }
+
+        res = session.get(f"{base_url}/content", headers=headers, verify=False, timeout=20)
+        res.raise_for_status()
+
+        soup = BeautifulSoup(res.text, 'html.parser')
+        title = soup.title.get_text(strip=True) if soup.title else ''
+
+        return jsonify({
+            'status': 'success',
+            'url': f"{base_url}/content",
+            'authorized_id': authorized_id,
+            'csrf_token': csrf_token,
+            'title': title,
+            'html_content': res.text
+        })
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 401
+
+@data_bp.route('/fetch-profile-credentials', methods=['POST'])
+def fetch_profile_credentials():
+    return profile.fetch_credentials(request)
 
 @data_bp.route('/fetch-attendance-detail', methods=['POST'])
 def fetch_attendance_detail():
