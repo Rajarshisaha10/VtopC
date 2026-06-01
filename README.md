@@ -30,7 +30,6 @@ VTOP's official portal is notoriously painful to use. VtopC acts as a middleware
 VtopC/
 ├── app.py               # Flask app entry point, blueprint registration
 ├── auth.py              # Login, auto-login, logout, session handling
-├── chat_routes.py       # Chat feature routes
 ├── session_manager.py   # In-memory session storage
 ├── data_routes/         # Routes for fetching VTOP data (attendance, marks, etc.)
 ├── parsers/             # BeautifulSoup parsers for VTOP HTML responses
@@ -54,7 +53,7 @@ VtopC/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Rajarshisaha10/VtopC.git
+   git clone https://github.com/VedantJJA/VtopC.git
    cd VtopC
    ```
 
@@ -148,10 +147,10 @@ Pull requests are welcome. For significant changes, open an issue first to discu
 
 ## Disclaimer
 
-This project is not affiliated with VIT or VTOP. It scrapes a live portal and may break if VTOP changes its HTML structure. Use at your own risk. Do not use this to violate VIT's terms of service.
+This project is an independent student-created dashboard and is not affiliated with VIT or VTOP. It scrapes live VTOP portal data and may break if VTOP's HTML structure changes. Use responsibly and ensure compliance with VIT's terms of service.
 
 ---
 
 ## License
 
-This repository is a fork. Refer to the [original repository](https://github.com/VedantJJA/VtopC) for license information.
+For legal information including privacy and terms, see the Legal section in the app.

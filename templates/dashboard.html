@@ -114,8 +114,6 @@
     <script src="{{ url_for('static', filename='lucide.js') }}"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body
@@ -128,10 +126,16 @@
     <aside id="sidebar"
         class="sidebar w-64 fixed inset-y-0 left-0 z-30 overflow-y-auto shadow-xl md:relative md:translate-x-0 transform -translate-x-full bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700 transition-colors duration-200">
         <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">VTOP Client</h1>
+            <a href="#" id="brand-dashboard-link"
+                class="inline-flex items-center gap-2 text-2xl font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
+                <i data-lucide="graduation-cap" class="h-6 w-6"></i>
+                <span>VTOP Client</span>
+            </a>
             <a href="#" class="nav-link mt-6 flex items-center hover:bg-gray-50 dark:hover:bg-gray-700/50 p-2 -mx-2 rounded-lg transition-colors cursor-pointer" data-section="profile">
-                <div class="h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-xl shrink-0">
-                    U</div>
+                <div class="h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-xl shrink-0 overflow-hidden">
+                    <img id="sidebar-avatar" src="" alt="Avatar" class="w-full h-full object-cover hidden">
+                    <span id="sidebar-avatar-text" class="text-xl font-bold">U</span>
+                </div>
                 <div class="ml-3 overflow-hidden">
                     <p id="sidebar-username" class="text-sm font-semibold text-gray-900 dark:text-white truncate">
                         Loading...</p>
@@ -146,6 +150,25 @@
                 data-section="dashboard">
                 <i data-lucide="layout-dashboard" class="mr-3 h-5 w-5"></i> Dashboard
             </a>
+
+            <div x-data="{ open: false }" class="space-y-1">
+                <button @click="open = !open"
+                    class="w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                    data-section="my-info">
+                    <div class="flex items-center"><i data-lucide="id-card" class="mr-3 h-5 w-5"></i> My Info
+                    </div>
+                    <i data-lucide="chevron-down" class="h-4 w-4 transition-transform duration-200"
+                        :class="{'rotate-180': open}"></i>
+                </button>
+                <div x-show="open" class="pl-11 space-y-1">
+                    <a href="#"
+                        class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                        data-parent="my-info" data-subsection="my-info-credentials">Credentials</a>
+                    <a href="#"
+                        class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
+                        data-parent="my-info" data-subsection="my-info-profile">Student Profile</a>
+                </div>
+            </div>
 
             <div x-data="{ open: false }" class="space-y-1">
                 <button @click="open = !open"
@@ -206,22 +229,6 @@
                 </div>
             </div>
 
-            <a href="#"
-                class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
-                data-section="notes-forum">
-                <i data-lucide="message-square" class="mr-3 h-5 w-5"></i> Notes Forum
-            </a>
-
-            <a href="#"
-                class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
-                data-section="find-people">
-                <i data-lucide="users" class="mr-3 h-5 w-5"></i> RoomieMatch
-            </a>
-
-            <a href="#" class="nav-link flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors" data-section="task-hub">
-                <i data-lucide="check-square" class="mr-3 h-5 w-5"></i> Task Hub
-            </a>
-
             <div x-data="{ open: false }" class="space-y-1 mt-4 border-t border-gray-100 dark:border-gray-700 pt-2">
                 <button @click="open = !open"
                     class="nav-link w-full flex justify-between items-center px-4 py-2.5 text-sm font-medium rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
@@ -235,9 +242,6 @@
                     <a href="#"
                         class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
                         data-parent="extra" data-subsection="extra-calculator">Attendance Calculator</a>
-                    <a href="#"
-                        class="nav-link-child block px-3 py-2 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors"
-                        data-parent="extra" data-subsection="extra-directory">Student Directory</a>
                 </div>
             </div>
         </nav>
@@ -276,7 +280,7 @@
             </div>
         </header>
 
-        <div id="content" class="flex-1 p-6 lg:p-8 overflow-y-auto scroll-smooth pb-24">
+        <div id="content" class="flex-1 p-6 lg:p-8 overflow-y-auto scroll-smooth">
 
             <div id="dashboard" class="page-section">
                 <div class="flex items-center justify-between mb-6">
@@ -356,14 +360,66 @@
                 </div>
             </div>
 
+            <div id="my-info" class="hidden page-section">
+                <div id="my-info-credentials" class="my-info-subsection">
+                    <section>
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <div>
+                                <h2 class="text-3xl font-bold text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
+                                    Credentials
+                                </h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">View your VTOP account credentials and exam access details.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden" id="credentials-container">
+                            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+                                <h3 class="font-bold text-gray-900 dark:text-white flex items-center text-md">
+                                    <i data-lucide="id-card" class="w-5 h-5 mr-2 text-indigo-500"></i> Saved Values
+                                </h3>
+                            </div>
+
+                            <div id="creds-status" class="p-10 flex flex-col items-center justify-center text-center bg-gray-50/50 dark:bg-gray-900/50">
+                                <div class="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4 border border-gray-100 dark:border-gray-700">
+                                    <i data-lucide="loader-2" class="w-8 h-8 text-indigo-500 animate-spin"></i>
+                                </div>
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Loading credentials</h4>
+                                <p class="text-gray-500 dark:text-gray-400 text-sm mb-6 max-w-md">
+                                    Fetching the account values from your active VTOP session.
+                                </p>
+                            </div>
+
+                            <div id="creds-content" class="hidden"></div>
+                        </div>
+                    </section>
+                </div>
+
+                <div id="my-info-profile" class="my-info-subsection hidden">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-800 dark:text-white border-b-4 border-indigo-500 inline-block pb-2">
+                                Student Profile
+                            </h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Your personal academic information and details.</p>
+                        </div>
+                    </div>
+
+                    <div id="my-info-profile-container" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div class="p-8">
+                            <div class="flex items-center justify-center">
+                                <i data-lucide="loader" class="animate-spin h-8 w-8 text-indigo-500 mr-3"></i>
+                                <p class="text-gray-600 dark:text-gray-300">Loading student profile...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="hostel" class="hidden page-section">
                 <div id="hostel-my-room" class="hostel-subsection">
                     
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                         <h2 class="text-2xl font-bold text-gray-800 dark:text-white">My Room</h2>
-                        <button class="nav-link px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center shadow-sm cursor-pointer" data-section="chat">
-                            <i data-lucide="message-square" class="h-4 w-4 mr-2"></i> Chat Room
-                        </button>
                     </div>
 
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -427,68 +483,6 @@
                         </div>
                     </div>
 
-                </div>
-            </div>
-
-            <div id="notes-forum" class="hidden page-section">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
-                            <i data-lucide="message-square" class="mr-3 h-6 w-6 text-indigo-500"></i> Notes Forum
-                        </h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Share materials, ask questions, and collaborate with your peers.</p>
-                    </div>
-                    <button id="nf-create-post-btn" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors flex items-center shadow-sm">
-                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i> Create Post
-                    </button>
-                </div>
-
-                <div id="notes-forum-app" class="max-w-4xl mx-auto mt-2">
-                    <div class="flex justify-center p-12"><i data-lucide="loader-2" class="animate-spin text-indigo-500 w-8 h-8"></i></div>
-                </div>
-            </div>
-
-            <div id="find-people" class="hidden page-section">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
-                            <i data-lucide="users" class="mr-3 h-6 w-6 text-indigo-500"></i> RoomieMatch
-                        </h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Find your perfect roommate based on your lifestyle.</p>
-                    </div>
-                </div>
-                <div id="roomie-match-app" class="max-w-2xl mx-auto mt-4"></div>
-            </div>
-
-            <div id="task-hub" class="hidden page-section">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center">
-                            <i data-lucide="check-square" class="mr-3 h-6 w-6 text-indigo-500"></i> Task Hub
-                        </h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage your assignments, projects, and studies.</p>
-                    </div>
-                </div>
-
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-8">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <input type="text" id="task-title" placeholder="Task description..." class="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 dark:text-white font-medium">
-                        <select id="task-category" class="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 dark:text-white">
-                            <option value="Assignments">Assignment</option>
-                            <option value="Topics to Study">Topic to Study</option>
-                            <option value="Lab Experiments">Lab Experiment</option>
-                            <option value="Projects">Project Milestone</option>
-                        </select>
-                        <select id="task-course-link" class="p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 dark:text-white">
-                            <option value="">Link Course (Optional)</option>
-                        </select>
-                        <button id="add-task-btn" class="bg-indigo-600 text-white rounded-xl px-4 py-3 font-bold hover:bg-indigo-700 transition-colors shadow-sm flex justify-center items-center gap-2">
-                            <i data-lucide="plus" class="w-4 h-4"></i> Add Task
-                        </button>
-                    </div>
-                </div>
-
-                <div id="task-list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 </div>
             </div>
 
@@ -561,10 +555,38 @@
                 <div id="profile-container"></div>
             </div>
 
-            <div id="chat" class="hidden page-section h-full flex flex-col">
-                <div id="chat-content-area" class="h-full">
+            <footer class="mt-10 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850 border border-gray-200 dark:border-gray-700 rounded-xl">
+                <div class="px-6 py-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="flex flex-col">
+                            <h3 class="font-bold text-gray-900 dark:text-white mb-2">VtopC</h3>
+                            <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">I know I am awesome</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-500 mt-2">Made for time pass by AIP</p>
+                        </div>
+
+                        <div class="flex flex-col">
+                            <h3 class="font-bold text-gray-900 dark:text-white mb-2 text-xs">Legal</h3>
+                            <a href="{{ url_for('legal') }}" class="text-xs text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1">
+                                <i data-lucide="file-text" class="w-3 h-3"></i> Policies & Contact
+                            </a>
+                        </div>
+
+                        <div class="flex flex-col">
+                            <h3 class="font-bold text-gray-900 dark:text-white mb-2 text-xs">Community</h3>
+                            <a href="https://github.com/VedantJJA/VtopC" target="_blank" rel="noopener noreferrer" class="text-xs text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-2 w-fit">
+                                <i data-lucide="github" class="w-4 h-4"></i> GitHub Repository
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 dark:border-gray-700 my-4"></div>
+
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500 dark:text-gray-400">
+                        <p>&copy; 2026 VtopC. Not affiliated with VIT.</p>
+                        <p>Version <span class="font-semibold text-gray-700 dark:text-gray-300">2.0</span></p>
+                    </div>
                 </div>
-            </div>
+            </footer>
 
         </div>
     </main>
@@ -585,20 +607,9 @@
         </div>
     </div>
 
+    <script id="firebase-config" type="application/json">{{ firebase_config | default('null') | tojson | safe }}</script>
     <script>
-        window.FIREBASE_CONFIG = {{ firebase_config | default('null') | tojson | safe }};
-        
-        // Map Supabase variables flawlessly for ALL modules
-        const rawSupaConfig = {{ supabase_config | default('null') | tojson | safe }};
-        if (rawSupaConfig) {
-            window.SUPABASE_CONFIG = {
-                url: rawSupaConfig.url,
-                anonKey: rawSupaConfig.anonKey,
-                key: rawSupaConfig.anonKey // Automatically provides .key for your Chat room
-            };
-        } else {
-            window.SUPABASE_CONFIG = null;
-        }
+        window.FIREBASE_CONFIG = JSON.parse(document.getElementById('firebase-config').textContent);
     </script>
 
     <script src="{{ url_for('static', filename='alpine.js') }}" defer></script>

@@ -2,11 +2,7 @@ import { API_BASE_URL, TARGETS } from './modules/constants.js';
 import { state } from './modules/state.js';
 import * as UI from './modules/ui.js';
 import * as Data from './modules/data_service.js';
-import { initRoommateChat } from './modules/chat.js'; 
-import * as RoomManager from './modules/room_manager.js'; 
-import * as RoomieMatch from './modules/roomie_match.js'; 
-import * as NotesForum from './modules/notes_forum.js';   
-import * as TaskManager from './modules/task_manager.js'; 
+import * as RoomManager from './modules/room_manager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Dashboard module loaded. Version: Modular Secure Chat");
@@ -27,21 +23,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let decryptedStudentList = [];
     let isDirectoryUnlocked = false;
+    let credentialsLoaded = false;
+    let credentialsLoading = false;
 
     const elements = {
         menuToggle: document.getElementById('menu-toggle'),
         sidebar: document.getElementById('sidebar'),
         sidebarOverlay: document.getElementById('sidebar-overlay'),
+        brandDashboardLink: document.getElementById('brand-dashboard-link'),
         navLinks: document.querySelectorAll('.nav-link'),
         navLinkChildren: document.querySelectorAll('.nav-link-child'),
         pageSections: document.querySelectorAll('.page-section'),
         academicsToggle: document.querySelector('[data-section="academics"]'),
         examinationsToggle: document.querySelector('[data-section="examinations"]'),
         extraToggle: document.querySelector('[data-section="extra"]'),
+        myInfoToggle: document.querySelector('[data-section="my-info"]'),
         semesterSelect: document.getElementById('semester-select'),
         logoutBtn: document.getElementById('logoutBtn'),
         sidebarUsername: document.getElementById('sidebar-username'),
         sidebarRegNo: document.getElementById('sidebar-regno'),
+        sidebarAvatar: document.getElementById('sidebar-avatar'),
+        sidebarAvatarText: document.getElementById('sidebar-avatar-text'),
         contentContainer: document.getElementById('content'),
         btnQuickAttendance: document.getElementById('btn-quick-attendance'),
         btnQuickMarks: document.getElementById('btn-quick-marks'),
@@ -56,9 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
         enrollment: document.getElementById('enrollment-container'), 
         profile: document.getElementById('profile-container'),
         calculator: document.getElementById('extra-calculator'),
+        credentialsStatus: document.getElementById('creds-status'),
+        credentialsContent: document.getElementById('creds-content'),
+        myInfoProfileContainer: document.getElementById('my-info-profile-container'),
         
-        chatContentArea: document.getElementById('chat-content-area'),
-
         dirPassword: document.getElementById('dir-password'),
         dirTogglePassword: document.getElementById('dir-toggle-password'),
         dirSearch: document.getElementById('dir-search'),
@@ -80,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.todaySchedule, elements.timetable, elements.courses,
         elements.attendance, elements.marks, elements.examSchedule,
         elements.calendar, elements.enrollment, elements.profile,
+        elements.credentialsContent, elements.myInfoProfileContainer,
         elements.calculator
     ].filter(Boolean);
 
@@ -101,6 +105,61 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function updateSidebarAvatar(photoUrl) {
+        if (photoUrl && elements.sidebarAvatar && elements.sidebarAvatarText) {
+            elements.sidebarAvatar.src = photoUrl;
+            elements.sidebarAvatar.classList.remove('hidden');
+            elements.sidebarAvatarText.classList.add('hidden');
+            localStorage.setItem('vtop_profile_photo', photoUrl);
+        }
+    }
+
+    function showCredentialsStatus(title, message, isError = false) {
+        if (!elements.credentialsStatus) return;
+        const icon = isError ? 'circle-alert' : 'loader-2';
+        const iconClass = isError ? 'text-red-500' : 'text-indigo-500 animate-spin';
+        elements.credentialsStatus.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4 border border-gray-100 dark:border-gray-700">
+                <i data-lucide="${icon}" class="w-8 h-8 ${iconClass}"></i>
+            </div>
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">${title}</h4>
+            <p class="text-gray-500 dark:text-gray-400 text-sm max-w-md">${message}</p>
+        `;
+        elements.credentialsStatus.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    async function loadCredentials() {
+        if (!elements.credentialsContent || credentialsLoading || credentialsLoaded) return;
+
+        credentialsLoading = true;
+        elements.credentialsContent.classList.add('hidden');
+        showCredentialsStatus('Loading credentials', 'Fetching the account values from your active VTOP session.');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/${TARGETS.CREDENTIALS}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    session_id: localStorage.getItem('vtop_session_id')
+                })
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Unable to load credentials.');
+
+            elements.credentialsContent.innerHTML = data.html_content;
+            elements.credentialsContent.classList.remove('hidden');
+            if (elements.credentialsStatus) elements.credentialsStatus.classList.add('hidden');
+            credentialsLoaded = true;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } catch (error) {
+            showCredentialsStatus('Unable to load credentials', error.message || 'Please refresh the session and try again.', true);
+        } finally {
+            credentialsLoading = false;
+        }
+    }
+
     function refreshCurrentPage() {
         try {
             if (UI && typeof UI.clearAllDataContainers === 'function') {
@@ -111,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const activeNav = document.querySelector('.nav-link.active');
 
-            if (activeNav && !['academics', 'examinations', 'extra'].includes(activeNav.dataset.section)) {
+            if (activeNav && !['academics', 'examinations', 'extra', 'my-info'].includes(activeNav.dataset.section)) {
                 const sectionId = activeNav.dataset.section;
                 
                 if (sectionId === 'dashboard') {
@@ -161,36 +220,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (link) link.click();
     });
 
+    if (elements.brandDashboardLink) elements.brandDashboardLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (UI && UI.showPageSection) UI.showPageSection('dashboard', elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle, elements.myInfoToggle);
+        closeSidebar();
+        elements.contentContainer.scrollTop = 0;
+    });
+
     elements.navLinks.forEach(link => {
-        if (['academics', 'examinations', 'extra'].includes(link.dataset.section)) return;
+        if (['academics', 'examinations', 'extra', 'my-info'].includes(link.dataset.section)) return;
         link.addEventListener('click', async (e) => {
             e.preventDefault();
-            if (UI && UI.showPageSection) UI.showPageSection(link.dataset.section, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
+            if (UI && UI.showPageSection) UI.showPageSection(link.dataset.section, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle, elements.myInfoToggle);
 
             const section = link.dataset.section;
             if (section === 'enrollment' && elements.enrollment && Data && Data.fetchAndDisplay) Data.fetchAndDisplay(TARGETS.ENROLLMENT, elements.enrollment, "Course Enrollment");
-            else if (section === 'profile' && Data && Data.fetchAndDisplay) Data.fetchAndDisplay(TARGETS.PROFILE, elements.profile, "Profile");
-            
-            if (section === 'chat') {
-                const container = elements.chatContentArea;
-                if (!document.getElementById('chat-container')) {
-                    try {
-                        const response = await fetch('/fetch-chat', { method: 'POST' });
-                        const data = await response.json();
-                        container.innerHTML = data.html_content;
-                        if (typeof lucide !== 'undefined') lucide.createIcons();
-                    } catch (err) {
-                        container.innerHTML = '<p class="text-center p-10 text-red-500">Failed to load chat UI.</p>';
-                        return;
+            else if (section === 'profile' && Data && Data.fetchAndDisplay) {
+                Data.fetchAndDisplay(TARGETS.PROFILE, elements.profile, "Profile");
+                // Extract profile photo URL after a short delay to allow DOM to update
+                setTimeout(() => {
+                    const profileImg = elements.profile.querySelector('img');
+                    if (profileImg && profileImg.src) {
+                        updateSidebarAvatar(profileImg.src);
                     }
-                }
-                initRoommateChat(); 
+                }, 500);
             }
-
-            else if (section === 'find-people') RoomieMatch.initRoomieMatch();
-            else if (section === 'notes-forum') NotesForum.initNotesForum();
-            else if (section === 'task-hub') TaskManager.initTaskManager();
-
             closeSidebar();
             elements.contentContainer.scrollTop = 0;
         });
@@ -202,10 +256,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const parentId = link.dataset.parent;
             const subsectionId = link.dataset.subsection;
 
-            if (UI && UI.showPageSection) UI.showPageSection(parentId, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
+            if (UI && UI.showPageSection) UI.showPageSection(parentId, elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle, elements.myInfoToggle);
             if (UI && UI.showSubsection) UI.showSubsection(parentId, subsectionId, elements.navLinkChildren);
 
-            if (subsectionId === 'extra-calculator') {
+            if (subsectionId === 'my-info-credentials') loadCredentials();
+            else if (subsectionId === 'my-info-profile') {
+                if (Data && Data.fetchAndDisplay) Data.fetchAndDisplay(TARGETS.PROFILE, elements.myInfoProfileContainer, "Student Profile");
+                // Extract profile photo after a short delay
+                setTimeout(() => {
+                    const profileImg = elements.myInfoProfileContainer.querySelector('img');
+                    if (profileImg && profileImg.src) {
+                        updateSidebarAvatar(profileImg.src);
+                    }
+                }, 500);
+            }
+            else if (subsectionId === 'extra-calculator') {
                 elements.calculator.innerHTML = '<div class="p-8 text-center"><i data-lucide="loader" class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-2"></i><p class="text-gray-500">Opening calculator...</p></div>';
                 if (typeof lucide !== 'undefined') lucide.createIcons();
 
@@ -215,7 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             else if (subsectionId === 'academics-courses') Data.fetchTimetableAndCourses(elements.courses, null, null);
             else if (subsectionId === 'academics-timetable') Data.fetchTimetableAndCourses(null, elements.timetable, null);
-            else if (subsectionId === 'academics-attendance') Data.fetchAndCalculateAttendanceSnapshot().then(() => Data.fetchAndDisplay(TARGETS.ATTENDANCE, elements.attendance, "Attendance"));
+            else if (subsectionId === 'academics-attendance') {
+                Data.fetchAndCalculateAttendanceSnapshot()
+                    .then(() => Data.fetchAndDisplay(TARGETS.ATTENDANCE, elements.attendance, "Attendance"));
+            }
             else if (subsectionId === 'academics-calendar') Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar");
             else if (subsectionId === 'examinations-marks') Data.fetchAndDisplay(TARGETS.MARKS, elements.marks, "Marks");
             else if (subsectionId === 'examinations-schedule') Data.fetchAndDisplay(TARGETS.EXAM_SCHEDULE, elements.examSchedule, "Exam Schedule");
@@ -443,9 +511,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadCachedData() {
         const cachedName = localStorage.getItem('vtop_username_cache');
         const cachedRegNo = localStorage.getItem('vtop_regno_cache');
+        const cachedPhoto = localStorage.getItem('vtop_profile_photo');
 
         if (elements.sidebarUsername) elements.sidebarUsername.textContent = cachedName || 'User';
         if (elements.sidebarRegNo) elements.sidebarRegNo.textContent = cachedRegNo || 'Checking Session...';
+        if (cachedPhoto) updateSidebarAvatar(cachedPhoto);
 
         const savedSemId = localStorage.getItem('vtop_semester_id');
         if (savedSemId) {
@@ -455,7 +525,6 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.semesterSelect.innerHTML = `<option disabled>No semester saved</option>`;
         }
         
-        refreshCurrentPage();
     }
 
     async function checkSessionAndFetchLatest() {
@@ -547,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
-    if (UI && UI.showPageSection) UI.showPageSection('dashboard', elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle);
+    if (UI && UI.showPageSection) UI.showPageSection('dashboard', elements.pageSections, elements.navLinks, elements.academicsToggle, elements.examinationsToggle, elements.extraToggle, elements.myInfoToggle);
     
     loadCachedData();
     checkSessionAndFetchLatest();

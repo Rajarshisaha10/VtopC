@@ -1,4 +1,4 @@
-export function showPageSection(sectionId, pageSections, navLinks, academicsToggle, examinationsToggle, extraToggle) {
+export function showPageSection(sectionId, pageSections, navLinks, academicsToggle, examinationsToggle, extraToggle, myInfoToggle) {
     pageSections.forEach(section => {
         section.style.display = section.id === sectionId ? 'block' : 'none';
     });
@@ -7,10 +7,12 @@ export function showPageSection(sectionId, pageSections, navLinks, academicsTogg
     if (academicsToggle) academicsToggle.classList.remove('active');
     if (examinationsToggle) examinationsToggle.classList.remove('active');
     if (extraToggle) extraToggle.classList.remove('active');
+    if (myInfoToggle) myInfoToggle.classList.remove('active');
 
     if (sectionId === 'academics' && academicsToggle) academicsToggle.classList.add('active');
     if (sectionId === 'examinations' && examinationsToggle) examinationsToggle.classList.add('active');
     if (sectionId === 'extra' && extraToggle) extraToggle.classList.add('active');
+    if (sectionId === 'my-info' && myInfoToggle) myInfoToggle.classList.add('active');
 }
 
 export function showSubsection(parentId, subsectionId, navLinkChildren) {
