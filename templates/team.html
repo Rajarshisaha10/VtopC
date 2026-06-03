@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team AIP - VtopC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen flex flex-col">
+
+    <main class="flex-grow max-w-5xl mx-auto px-6 py-12 w-full">
+        <div class="text-center mb-12">
+            <h1 class="text-3xl md:text-4xl font-extrabold mb-4">Meet Team AIP</h1>
+            <p class="text-gray-600 dark:text-gray-400">The developers behind VtopC.</p>
+        </div>
+
+        <!-- Team Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+
+            <!-- Team Member Card 1 -->
+            <div
+                class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                <img src="https://github.com/kumar-shaurya.png" alt="Kumar Shaurya"
+                    class="w-20 h-20 rounded-full object-cover mb-4 border-2 border-indigo-100 dark:border-indigo-900/50">
+
+                <h3 class="font-bold text-lg mb-1">Kumar Shaurya</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Developer</p>
+
+                <!-- GitHub Link -->
+                <a href="https://github.com/kumar-shaurya" target="_blank"
+                    class="mt-auto items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                    <i data-lucide="github" class="w-4 h-4"></i> GitHub Profile
+                </a>
+            </div>
+
+            <div
+                class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                <img src="https://github.com/VedantJJA.png" alt="Vedant"
+                    class="w-20 h-20 rounded-full object-cover mb-4 border-2 border-indigo-100 dark:border-indigo-900/50">
+
+                <h3 class="font-bold text-lg mb-1">Vedant</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Developer</p>
+
+                <!-- GitHub Link -->
+                <a href="https://github.com/VedantJJA" target="_blank"
+                    class="mt-auto items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                    <i data-lucide="github" class="w-4 h-4"></i> GitHub Profile
+                </a>
+            </div>
+
+            <div
+                class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                <img src="https://github.com/Rajarshisaha10.png" alt="Rajarshi Saha"
+                    class="w-20 h-20 rounded-full object-cover mb-4 border-2 border-indigo-100 dark:border-indigo-900/50">
+
+                <h3 class="font-bold text-lg mb-1">Rajarshi Saha</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Developer</p>
+
+                <!-- GitHub Link -->
+                <a href="https://github.com/Rajarshisaha10" target="_blank"
+                    class="mt-auto items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                    <i data-lucide="github" class="w-4 h-4"></i> GitHub Profile
+                </a>
+            </div>
+
+        </div>
+
+        <!-- Back Button -->
+        <div class="mt-16 text-center">
+            <a href="{{ url_for('index') }}"
+                class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 transition-colors">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Dashboard
+            </a>
+        </div>
+    </main>
+
+    <!-- Include your shiny new global footer here too! -->
+    {% include 'global_components/footer.html' %}
+
+    <!-- Initialize Lucide Icons -->
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
