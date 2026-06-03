@@ -2,13 +2,14 @@ from flask import request, jsonify, render_template
 from bs4 import BeautifulSoup
 from . import data_bp
 from .utils import get_session_details
-from . import timetable, attendance, calendar, marks, exams, profile
+from . import timetable, attendance, calendar, marks, exams, profile, grades
 
 # Constants for Dispatching
 TIMETABLE_TARGET = 'academics/common/StudentTimeTableChn'
 ATTENDANCE_TARGET = 'processViewStudentAttendance'
 CALENDAR_TARGET = 'academics/common/CalendarPreview'
 MARKS_TARGET = 'examinations/doStudentMarkView'
+GRADES_TARGET = 'examinations/examGradeView/doStudentGradeView'
 EXAM_SCHEDULE_TARGET = 'examinations/doSearchExamScheduleForStudent'
 PROFILE_TARGET = 'student/studentProfileView'
 
@@ -55,6 +56,9 @@ def fetch_data():
 
         elif target == PROFILE_TARGET:
             return profile.fetch_profile(context, data)
+
+        elif target == GRADES_TARGET:
+            return grades.fetch_grades(context, data)
         
         else:
             # Fallback for generic/unknown targets

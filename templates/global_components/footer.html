@@ -1,0 +1,28 @@
+<footer class="w-full border-t border-gray-200 dark:border-gray-800 mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        
+        <!-- Left Side: Copyright -->
+        <div class="flex-1 text-center md:text-left text-xs text-gray-500 dark:text-gray-500">
+            <span>&copy; 2026 Student-Hub. Not affiliated with VIT.</span>
+        </div>
+
+        <!-- Center: Team AIP -->
+        <div class="flex-1 text-center">
+            <span class="text-gray-800 dark:text-gray-200 font-medium text-sm">
+                Made with <span class="text-red-500">❤</span> by 
+                <a href="{{ url_for('team') }}" class="font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Team AIP</a>
+            </span>
+        </div>
+
+        <!-- Right Side: Links -->
+        <div class="flex-1 flex justify-center md:justify-end gap-6 text-xs text-gray-500 dark:text-gray-500">
+            <a href="{{ url_for('legal') }}" class="hover:text-gray-900 dark:hover:text-gray-300 transition-colors flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Legal
+            </a>
+            <a href="https://github.com/VedantJJA/VtopC" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 dark:hover:text-gray-300 transition-colors flex items-center gap-1.5">
+                <i data-lucide="github" class="w-3.5 h-3.5"></i> GitHub
+            </a>
+        </div>
+        
+    </div>
+</footer>

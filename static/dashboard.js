@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         courses: document.getElementById('courses-container'),
         attendance: document.getElementById('attendance-container'),
         marks: document.getElementById('marks-container'),
+        grades: document.getElementById('grades-container'),
         examSchedule: document.getElementById('exam-schedule-container'),
         calendar: document.getElementById('calendar-container'),
         enrollment: document.getElementById('enrollment-container'), 
@@ -81,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const allDataContainers = [
         elements.todaySchedule, elements.timetable, elements.courses,
-        elements.attendance, elements.marks, elements.examSchedule,
+        elements.attendance, elements.marks, elements.examSchedule, elements.grades,
         elements.calendar, elements.enrollment, elements.profile,
         elements.credentialsContent, elements.myInfoProfileContainer,
         elements.calculator
@@ -286,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             else if (subsectionId === 'academics-calendar') Data.fetchAndDisplay(TARGETS.CALENDAR, elements.calendar, "Academic Calendar");
             else if (subsectionId === 'examinations-marks') Data.fetchAndDisplay(TARGETS.MARKS, elements.marks, "Marks");
+            else if (subsectionId === 'examinations-grades') Data.fetchAndDisplay(TARGETS.GRADES, elements.grades, "Grades");
             else if (subsectionId === 'examinations-schedule') Data.fetchAndDisplay(TARGETS.EXAM_SCHEDULE, elements.examSchedule, "Exam Schedule");
             else if (subsectionId === 'hostel-my-room') {
                             RoomManager.populateMyRoomData();

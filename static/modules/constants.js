@@ -3,6 +3,7 @@ export const API_BASE_URL = window.location.origin;
 export const TARGETS = {
     TIMETABLE: 'academics/common/StudentTimeTableChn',
     MARKS: 'examinations/doStudentMarkView',
+    GRADES: 'examinations/examGradeView/doStudentGradeView',
     EXAM_SCHEDULE: 'examinations/doSearchExamScheduleForStudent',
     ATTENDANCE: 'processViewStudentAttendance',
     ATTENDANCE_DETAIL: 'fetch-attendance-detail',

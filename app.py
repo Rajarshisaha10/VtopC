@@ -61,6 +61,10 @@ def terms_of_service():
     """Serves the terms of service page."""
     return render_template('legal.html')
 
+@app.route('/team')
+def team():
+    return render_template('team.html')
+
 @app.route('/sw.js')
 def service_worker():
     response = send_from_directory('static', 'sw.js', mimetype='application/javascript')
